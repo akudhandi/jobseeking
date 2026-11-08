@@ -53,3 +53,6 @@ desktop.ini
 .vscode/
 .idea/
 *.swp
+
+# Assistant/agent spec (environment, not project)
+AGENTS.md
