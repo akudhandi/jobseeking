@@ -1,0 +1,7 @@
+# jobseeking prod maintenance. Edit the path to match your clone.
+# Install:  crontab deploy/cron/crontab.example
+#
+# min  hour dom mon dow  command
+15 2 * * *   /opt/jobseeking/deploy/cron/scrape.sh  >> /var/log/jobseeking-scrape.log 2>&1
+30 2 * * *   /opt/jobseeking/deploy/cron/backup.sh  >> /var/log/jobseeking-backup.log 2>&1
+45 3 * * 0   /opt/jobseeking/deploy/cron/prune.sh   >> /var/log/jobseeking-prune.log  2>&1

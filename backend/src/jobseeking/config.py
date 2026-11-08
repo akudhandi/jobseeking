@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -14,8 +15,8 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = PACKAGE_DIR.parents[1]
 REPO_ROOT = PACKAGE_DIR.parents[2]
 
-CONFIG_YAML = BACKEND_DIR / "config.yaml"
-DATA_DIR = REPO_ROOT / "data"
+CONFIG_YAML = Path(os.environ.get("CONFIG_PATH") or (BACKEND_DIR / "config.yaml"))
+DATA_DIR = Path(os.environ.get("DATA_DIR") or (REPO_ROOT / "data"))
 RAW_DIR = DATA_DIR / "raw"
 EXPORT_DIR = DATA_DIR / "exports"
 

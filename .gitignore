@@ -18,6 +18,7 @@ htmlcov/
 .env
 .env.local
 .env.*.local
+.env.prod
 !.env.example
 
 # Proxy / credential dumps (NEVER commit)
@@ -30,8 +31,10 @@ secrets/
 # Data dumps (large, replayable)
 data/raw/
 data/exports/
+data/backups/
 *.sqlite
 *.sqlite3
+*.db
 
 # Node / Next.js
 node_modules/

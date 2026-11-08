@@ -1,0 +1,108 @@
+# Production stack: Postgres + FastAPI + Next.js + Caddy (TLS + basic auth).
+# Usage:
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm scraper --max-pages 5
+name: jobseeking-prod
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jobseeking}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.prod}
+      POSTGRES_DB: ${POSTGRES_DB:-jobseeking}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jobseeking} -d ${POSTGRES_DB:-jobseeking}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-jobseeking}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-jobseeking}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://jobs.example.com}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [internal]
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: /api
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_BASE: http://api:8000
+    depends_on:
+      - api
+    networks: [internal]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env.prod}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:-admin}
+      AUTH_HASH: ${AUTH_HASH:?set AUTH_HASH in .env.prod}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+    networks: [internal]
+
+  # Heavy image (Chromium) — only built/run on demand. Data volume persists raw HTML.
+  scraper:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.scraper
+    profiles: ["tools"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-jobseeking}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-jobseeking}
+      CAPSOLVER_API_KEY: ${CAPSOLVER_API_KEY:-}
+      PROXY_URLS: ${PROXY_URLS:-}
+      PROXY_FILE: /app/secrets/proxies.txt
+      PROXY_USERNAME: ${PROXY_USERNAME:-}
+      PROXY_PASSWORD: ${PROXY_PASSWORD:-}
+      HEADLESS: ${HEADLESS:-true}
+      SCRAPE_DELAY_MIN: ${SCRAPE_DELAY_MIN:-2.0}
+      SCRAPE_DELAY_MAX: ${SCRAPE_DELAY_MAX:-4.0}
+      SCRAPE_MAX_RETRIES: ${SCRAPE_MAX_RETRIES:-3}
+    volumes:
+      - ./data:/app/data
+      - ./secrets:/app/secrets:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal]
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+networks:
+  internal:
+    driver: bridge

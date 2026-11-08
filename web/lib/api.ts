@@ -1,5 +1,13 @@
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
+// Server components fetch the API over the internal docker network (avoids an
+// internet round-trip); the browser uses the public base (same-origin /api).
+const SERVER_BASE = process.env.API_INTERNAL_BASE ?? API_BASE;
+
+function baseForRequest() {
+  return typeof window === "undefined" ? SERVER_BASE : API_BASE;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, public path: string) {
     super(`API ${status} for ${path}`);
@@ -8,7 +16,7 @@ export class ApiError extends Error {
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
+  const res = await fetch(`${baseForRequest()}${path}`, { cache: "no-store" });
   if (!res.ok) throw new ApiError(res.status, path);
   return (await res.json()) as T;
 }

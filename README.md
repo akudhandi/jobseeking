@@ -104,3 +104,76 @@ npm run dev                    # http://localhost:3000
 ```
 
 Set `NEXT_PUBLIC_API_BASE` (default `http://localhost:8000`).
+
+## Deploy ke VPS (Docker + Caddy)
+
+Arsitektur produksi (`docker-compose.prod.yml`):
+
+```
+jobs.<domain>  -> Caddy (basic auth + TLS otomatis)
+    /api/*  ->  api:8000   (FastAPI)
+    /*      ->  web:3000   (Next.js standalone)
+db (Postgres, internal-only)   scraper (on-demand, lewat proxy residensial)
+```
+
+### 1. Prasyarat
+VPS Debian/Ubuntu, 2+ vCPU, 2 GB RAM (4 GB nyaman), 40 GB disk. Domain dengan
+A record `jobs.<domain>` -> IP VPS.
+```bash
+apt install -y docker.io docker-compose-plugin git
+```
+
+### 2. Ambil kode
+```bash
+mkdir -p /opt/jobseeking && cd /opt/jobseeking
+git clone https://github.com/akudhandi/jobseeking.git .
+```
+
+### 3. Konfigurasi
+```bash
+cp deploy/.env.prod.example .env.prod
+chmod 600 .env.prod
+# isi APP_DOMAIN, ACME_EMAIL, POSTGRES_PASSWORD, CAPSOLVER_API_KEY
+
+# hash password dashboard:
+docker run --rm caddy:2-alpine caddy hash-password --plaintext 'rahasia-ku'
+# -> tempel hasilnya ke AUTH_HASH di .env.prod
+
+mkdir -p secrets && chmod 700 secrets
+# taruh daftar proxy (host:port:user:pass) di: secrets/proxies.txt
+```
+
+### 4. Jalankan
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
+### 5. Scrape pertama
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm scraper --max-pages 3
+```
+
+### 6. Cron harian (scrape + backup + prune)
+```bash
+chmod +x deploy/cron/*.sh
+crontab deploy/cron/crontab.example   # sesuaikan path bila bukan /opt/jobseeking
+```
+
+### Update
+```bash
+git pull && docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
+### Ukuran image (perkiraan)
+| image | size | catatan |
+|---|---|---|
+| api | ~555 MB | selalu jalan |
+| web | ~325 MB | selalu jalan |
+| scraper | ~2.1 GB | hanya saat scrape |
+
+Disk 20 GB: jalankan `deploy/cron/prune.sh` mingguan. `data/raw` di-gzip + retensi 7 hari.
+
+### Keamanan
+- `db` tidak diekspos ke host, hanya di network internal.
+- Dashboard + API di balik HTTP basic auth Caddy.
+- `.env.prod` dan `secrets/` gitignored — jangan di-commit.
