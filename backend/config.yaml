@@ -1,0 +1,67 @@
+# Search matrix for the LinkedIn jobs crawl.
+# keyword x location, paginated until empty or max_pages reached.
+
+keywords:
+  - web developer
+  - software engineer
+  - frontend developer
+  - backend developer
+  - fullstack developer
+  - remote developer
+
+locations:
+  - "Jawa Timur, Indonesia"
+  - "Surabaya, Jawa Timur, Indonesia"
+  - "Malang, Jawa Timur, Indonesia"
+  - "Sidoarjo, Jawa Timur, Indonesia"
+  - "Gresik, Jawa Timur, Indonesia"
+  - "Kediri, Jawa Timur, Indonesia"
+  - "Jember, Jawa Timur, Indonesia"
+  - "Madiun, Jawa Timur, Indonesia"
+  - "Pasuruan, Jawa Timur, Indonesia"
+
+scrape:
+  max_pages: 10
+  results_per_page: 25
+  distance: 25            # km radius, LinkedIn `distance` param
+  fetch_detail: true      # fetch full description per jobId
+  delay_min: 2.0          # seconds between requests (lower bound)
+  delay_max: 4.0          # seconds between requests (upper bound)
+  max_retries: 3
+  timeout_ms: 45000
+  concurrency: 1          # keep 1 for safety with a single proxy pool
+  save_raw: true          # persist raw HTML under data/raw/ for --replay-raw
+
+# Cities treated as Jawa Timur for the is_jatim flag.
+jatim_cities:
+  - Surabaya
+  - Malang
+  - Sidoarjo
+  - Gresik
+  - Kediri
+  - Jember
+  - Madiun
+  - Pasuruan
+  - Probolinggo
+  - Mojokerto
+  - Blitar
+  - Batu
+  - Banyuwangi
+  - Jombang
+  - Lamongan
+  - Tuban
+  - Ngawi
+  - Ponorogo
+  - Bojonegoro
+  - Magetan
+  - Tulungagung
+  - Nganjuk
+  - Lumajang
+  - Situbondo
+  - Bondowoso
+  - Sampang
+  - Pamekasan
+  - Sumenep
+  - Bangkalan
+  - Trenggalek
+  - Pacitan

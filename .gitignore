@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.eggs/
+build/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Proxy / credential dumps (NEVER commit)
+batch_*.txt
+proxies*.txt
+*proxy*list*.txt
+secrets/
+*.credentials
+
+# Data dumps (large, replayable)
+data/raw/
+data/exports/
+*.sqlite
+*.sqlite3
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
