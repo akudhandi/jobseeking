@@ -30,7 +30,7 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    database_url: str = "postgresql+psycopg://jobseeking:jobseeking@localhost:5432/jobseeking"
+    database_url: str = "postgresql+psycopg://jobseeking:jobseeking@localhost:5433/jobseeking"
 
     proxy_urls: str = ""
     proxy_username: str = ""
