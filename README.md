@@ -45,17 +45,32 @@ and explore the result in a Next.js analytics dashboard.
 ## Quick start
 
 ```bash
-cp .env.example .env          # then edit PROXY_URLS / CAPSOLVER_API_KEY
-docker compose up -d db       # start Postgres
+cp .env.example .env          # then edit PROXY_FILE/PROXY_URLS and CAPSOLVER_API_KEY
+docker compose up -d db       # start Postgres (host port 5433)
 
 cd backend
 python -m venv .venv
 .venv\Scripts\activate        # Windows
-pip install -e .
+pip install -e ".[dev]"
 playwright install chromium
 
 python -m jobseeking.pipeline --init-db
 python -m jobseeking.pipeline --location "Jawa Timur, Indonesia" --max-pages 3
+```
+
+Configuration notes:
+
+- Postgres is mapped to host port **5433** (default) to avoid clashing with a local
+  PostgreSQL on 5432. Override with `POSTGRES_PORT`.
+- Proxy credentials live in a gitignored file. Set `PROXY_FILE` to a file with one proxy
+  per line (`host:port:user:pass` or `http://user:pass@host:port`). Never commit it.
+- `CAPSOLVER_API_KEY` enables captcha solving; without it the fetcher still retries.
+
+## Tests
+
+```bash
+cd backend
+pytest -q
 ```
 
 ## Batch scraping
