@@ -26,6 +26,24 @@ REMOTE_RE = re.compile(r"\b(remote|wfh|work from home|kerja dari rumah|remote wo
 HYBRID_RE = re.compile(r"\b(hybrid|hibrida|sebagian remote)\b", re.I)
 ONSITE_RE = re.compile(r"\b(onsite|on-site|on site|wfo|work from office|di kantor)\b", re.I)
 
+# "Kota Malang", "Kab. Sidoarjo", "Surabaya dan Sekitarnya" -> "Malang" / "Sidoarjo" / "Surabaya"
+_CITY_PREFIX_RE = re.compile(
+    r"^(kota administrasi|kota|kabupaten|kab\.?|city of|district of|municipality of)\s+", re.I
+)
+_CITY_SUFFIX_RE = re.compile(
+    r"\s+(dan\s+sekitarnya|and\s+surrounding\s+area|greater\s+area|area|region)\s*$", re.I
+)
+
+
+def _canonical_city(raw_city: str, jatim_cities: list[str] | None) -> str:
+    city = _CITY_PREFIX_RE.sub("", raw_city).strip()
+    city = _CITY_SUFFIX_RE.sub("", city).strip()
+    lowered = city.lower()
+    for canon in jatim_cities or []:
+        if canon.lower() == lowered:
+            return canon
+    return city
+
 
 @dataclass
 class LocationInfo:
@@ -43,6 +61,8 @@ def parse_location(raw: str | None, jatim_cities: list[str] | None = None) -> Lo
     city = parts[0] if parts else None
     if city and city.lower() in {"remote", "anywhere", "indonesia", "worldwide"}:
         city = None
+    if city:
+        city = _canonical_city(city, jatim_cities)
 
     province: str | None = None
     joined = raw.lower()

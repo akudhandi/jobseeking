@@ -23,9 +23,15 @@ def _s(
     cs: tuple[str, ...] = (),
     *,
     ci_name: bool = True,
+    slug: str | None = None,
 ) -> SkillDef:
     return SkillDef(
-        name=name, slug=_slug(name), category=category, aliases=aliases, cs_aliases=cs, ci_name=ci_name
+        name=name,
+        slug=slug or _slug(name),
+        category=category,
+        aliases=aliases,
+        cs_aliases=cs,
+        ci_name=ci_name,
     )
 
 
@@ -48,10 +54,8 @@ SKILL_DEFS: list[SkillDef] = [
     _s("Rust", "language"),
     _s("Scala", "language"),
     _s("Elixir", "language"),
-    _s("C#", "language", ("c#", "csharp", ".net c#")),
-    _s("C++", "language", ("c++", "cpp")),
-    _s("C", "language", (), ("C",), ci_name=False),
-    _s("R", "language", (), ("R",), ci_name=False),
+    _s("C#", "language", ("c#", "csharp", ".net c#"), slug="csharp"),
+    _s("C++", "language", ("c++", "cpp"), slug="cpp"),
     _s("SQL", "language", ("sql",)),
     _s("Bash", "language", ("shell", "shell script", "bash script")),
     _s("VBA", "language"),

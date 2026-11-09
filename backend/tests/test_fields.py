@@ -89,6 +89,21 @@ def test_parse_location():
     assert loc4.is_jatim is False
 
 
+def test_parse_location_normalizes_city_names():
+    cities = ["Malang", "Sidoarjo", "Surabaya"]
+    assert parse_location("Kota Malang, Jawa Timur", cities).city == "Malang"
+    assert parse_location("Malang, Jawa Timur", cities).city == "Malang"
+    assert parse_location("Kab. Sidoarjo, Jawa Timur", cities).city == "Sidoarjo"
+    assert parse_location("Surabaya dan Sekitarnya", cities).city == "Surabaya"
+    assert parse_location("surabaya, east java", cities).city == "Surabaya"
+
+
+def test_language_slugs_do_not_collide():
+    skills = set(extract_skills("Wajib menguasai C# dan C++"))
+    assert {"csharp", "cpp"} <= skills
+    assert "c" not in skills
+
+
 def test_detect_work_type():
     assert detect_work_type("Backend Developer", "Remote, Indonesia") == "remote"
     assert detect_work_type("Frontend Developer (Hybrid)") == "hybrid"
