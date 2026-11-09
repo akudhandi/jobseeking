@@ -128,12 +128,31 @@ Cloudflare Access (OTP email)
 Debian dengan Docker + Compose, user di grup `docker`. Port `18080` harus kosong
 (8080 sudah dipakai proses `keepalive`).
 
-Docker data-root dipindah ke `/data` supaya build tidak menekan root disk:
+`cron` tidak terpasang di image box, install dulu: `sudo apt-get install -y cron`.
+
+Pindahkan **dua** tempat penyimpanan ke `/data`, karena root disk cuma 16 GB:
+
 ```bash
+# 1. docker engine (container, volume, buildkit metadata)
 sudo mkdir -p /data/docker
 echo '{"data-root":"/data/docker"}' | sudo tee /etc/docker/daemon.json
-sudo systemctl restart docker
+
+# 2. containerd image store — kalau Docker pakai containerd snapshotter
+#    (cek: docker info | grep -i 'driver\|root'), layer image TIDAK ikut data-root
+#    dan tetap menumpuk di /var/lib/containerd.
+sudo systemctl stop docker docker.socket containerd
+sudo mkdir -p /data/containerd
+sudo rsync -aHAX --numeric-ids /var/lib/containerd/ /data/containerd/
+sudo containerd config default | sudo tee /etc/containerd/config.toml >/dev/null
+sudo sed -i 's#^root = .*#root = "/data/containerd"#' /etc/containerd/config.toml
+sudo rm -rf /var/lib/containerd
+sudo systemctl start containerd docker
 ```
+
+Kalau cuma `data-root` yang dipindah, `/` akan penuh lagi setelah beberapa kali
+build (`apt: You don't have enough free space in /var/cache/apt/archives/`) —
+itu gejala containerd store yang masih di root disk, bukan disk `/data` habis.
+Cek dengan `df -h / /data` dan `sudo du -sh /var/lib/containerd`.
 
 ### 2. Ambil kode
 ```bash
