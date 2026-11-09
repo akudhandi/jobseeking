@@ -70,8 +70,9 @@ class CrawlRun(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    keyword: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Full search matrix can join many keywords/locations, so these are Text.
+    keyword: Mapped[str | None] = mapped_column(Text, nullable=True)
+    location: Mapped[str | None] = mapped_column(Text, nullable=True)
     pages_fetched: Mapped[int] = mapped_column(Integer, default=0)
     jobs_found: Mapped[int] = mapped_column(Integer, default=0)
     jobs_new: Mapped[int] = mapped_column(Integer, default=0)
