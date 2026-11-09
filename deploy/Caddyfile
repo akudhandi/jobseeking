@@ -1,14 +1,17 @@
-{
-	email {$ACME_EMAIL:admin@example.com}
-}
-
-{$APP_DOMAIN} {
+# Origin behind the Cloudflare Tunnel (cf-tunnel on this box).
+# TLS and access control are handled at Cloudflare (Access + OTP), so Caddy
+# listens on plain HTTP and compose publishes it on 127.0.0.1:18080, which the
+# tunnel's public hostname points at.
+#
+# 8080 is already taken by the "keepalive" pm2 process — do not reuse it.
+:80 {
 	encode gzip
 
-	# Everything is behind HTTP basic auth (private dashboard).
-	basic_auth {
-		{$BASIC_AUTH_USER} {$AUTH_HASH}
-	}
+	# Fallback auth if Cloudflare Access is ever disabled. Uncomment together
+	# with BASIC_AUTH_USER / AUTH_HASH in .env.prod.
+	# basic_auth {
+	#	{$BASIC_AUTH_USER:admin} {$AUTH_HASH}
+	# }
 
 	# API under /api/* — prefix stripped before hitting the backend.
 	handle_path /api/* {

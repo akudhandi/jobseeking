@@ -105,75 +105,107 @@ npm run dev                    # http://localhost:3000
 
 Set `NEXT_PUBLIC_API_BASE` (default `http://localhost:8000`).
 
-## Deploy ke VPS (Docker + Caddy)
+## Deploy (instabox + Cloudflare Tunnel)
 
-Arsitektur produksi (`docker-compose.prod.yml`):
+Tidak ada IP publik dan tidak ada port 80/443 di box, jadi TLS + auth
+diselesaikan Cloudflare dan origin-nya cuma HTTP di loopback:
 
 ```
-jobs.<domain>  -> Caddy (basic auth + TLS otomatis)
-    /api/*  ->  api:8000   (FastAPI)
-    /*      ->  web:3000   (Next.js standalone)
-db (Postgres, internal-only)   scraper (on-demand, lewat proxy residensial)
+Cloudflare Access (OTP email)
+  jobs.sengganglabs.my.id
+        |
+        +-- Cloudflare Tunnel "cf-tunnel" (pm2, sudah jalan di box)
+              -> http://localhost:18080
+                   |
+                caddy:80 (container, tanpa TLS)
+                   |-- /api/* -> api:8000   (FastAPI, prefix dibuang)
+                   +-- /*     -> web:3000   (Next.js standalone, force-dynamic)
+                                 db (internal-only)
+                                 scraper (on-demand + cron, proxy residensial)
 ```
 
-### 1. Prasyarat
-VPS Debian/Ubuntu, 2+ vCPU, 2 GB RAM (4 GB nyaman), 40 GB disk. Domain dengan
-A record `jobs.<domain>` -> IP VPS.
+### 1. Prasyarat di box
+Debian dengan Docker + Compose, user di grup `docker`. Port `18080` harus kosong
+(8080 sudah dipakai proses `keepalive`).
+
+Docker data-root dipindah ke `/data` supaya build tidak menekan root disk:
 ```bash
-apt install -y docker.io docker-compose-plugin git
+sudo mkdir -p /data/docker
+echo '{"data-root":"/data/docker"}' | sudo tee /etc/docker/daemon.json
+sudo systemctl restart docker
 ```
 
 ### 2. Ambil kode
 ```bash
-mkdir -p /opt/jobseeking && cd /opt/jobseeking
-git clone https://github.com/akudhandi/jobseeking.git .
+sudo mkdir -p /data/jobseeking && sudo chown "$USER":"$USER" /data/jobseeking
+git clone https://github.com/akudhandi/jobseeking.git /data/jobseeking
+cd /data/jobseeking
 ```
 
 ### 3. Konfigurasi
 ```bash
 cp deploy/.env.prod.example .env.prod
 chmod 600 .env.prod
-# isi APP_DOMAIN, ACME_EMAIL, POSTGRES_PASSWORD, CAPSOLVER_API_KEY
-
-# hash password dashboard:
-docker run --rm caddy:2-alpine caddy hash-password --plaintext 'rahasia-ku'
-# -> tempel hasilnya ke AUTH_HASH di .env.prod
+# isi POSTGRES_PASSWORD (acak) dan CAPSOLVER_API_KEY
 
 mkdir -p secrets && chmod 700 secrets
-# taruh daftar proxy (host:port:user:pass) di: secrets/proxies.txt
+# scp daftar proxy (host:port:user:pass) ke secrets/proxies.txt, lalu:
+chmod 600 secrets/proxies.txt
 ```
 
 ### 4. Jalankan
 ```bash
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.prod -f docker-compose.prod.yml ps
 ```
 
-### 5. Scrape pertama
+Caddy hanya listen di `127.0.0.1:18080`. Verifikasi dari dalam box:
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18080/api/health
+```
+
+### 5. Cloudflare (dashboard, bukan file)
+Zero Trust -> Networks -> Tunnels -> tunnel `cf-tunnel` -> Public Hostname -> Add:
+```
+Subdomain: jobs        Domain: sengganglabs.my.id
+Service:   HTTP  ->  localhost:18080
+```
+Lalu Zero Trust -> Access -> Applications -> Add self-hosted untuk
+`jobs.sengganglabs.my.id`, policy `Allow` + `Emails` (email kamu).
+Aktifkan Access **sebelum** hostname, kalau tidak dashboard jadi publik.
+
+### 6. Scrape pertama
 ```bash
 docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm scraper --max-pages 3
 ```
 
-### 6. Cron harian (scrape + backup + prune)
+### 7. Cron
 ```bash
 chmod +x deploy/cron/*.sh
-crontab deploy/cron/crontab.example   # sesuaikan path bila bukan /opt/jobseeking
+crontab deploy/cron/crontab.example
 ```
+`scrape.sh` dijalankan tiap 30 menit tapi hanya benar-benar scrape kalau run
+terakhir > 20 jam (`MIN_INTERVAL`). Jadi kalau box sedang suspend saat jadwal,
+tick berikutnya menyusul. `MIN_INTERVAL=0 ./scrape.sh` untuk memaksa.
 
 ### Update
 ```bash
+cd /data/jobseeking
 git pull && docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 ```
 
-### Ukuran image (perkiraan)
+### Ukuran image
 | image | size | catatan |
 |---|---|---|
 | api | ~555 MB | selalu jalan |
 | web | ~325 MB | selalu jalan |
 | scraper | ~2.1 GB | hanya saat scrape |
 
-Disk 20 GB: jalankan `deploy/cron/prune.sh` mingguan. `data/raw` di-gzip + retensi 7 hari.
+Butuh ~8 GB kosong di `/data` (image + build cache). `deploy/cron/prune.sh`
+mingguan: gzip `data/raw` (>1 hari), hapus arsip (>7 hari), prune docker.
 
 ### Keamanan
-- `db` tidak diekspos ke host, hanya di network internal.
-- Dashboard + API di balik HTTP basic auth Caddy.
+- Tidak ada port publik. `db` dan `api` hanya di network internal compose.
+- Caddy bind ke `127.0.0.1:18080`, dijangkau hanya lewat Cloudflare Tunnel.
+- Auth di Cloudflare Access (OTP email); `basic_auth` Caddy tersedia sebagai cadangan.
 - `.env.prod` dan `secrets/` gitignored — jangan di-commit.

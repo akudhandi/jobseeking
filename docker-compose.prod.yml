@@ -1,4 +1,7 @@
-# Production stack: Postgres + FastAPI + Next.js + Caddy (TLS + basic auth).
+# Production stack: Postgres + FastAPI + Next.js + Caddy origin.
+# Runs behind the Cloudflare Tunnel on this box: no ports are exposed publicly,
+# only Caddy on 127.0.0.1:18080. TLS + auth happen at Cloudflare.
+#
 # Usage:
 #   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 #   docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm scraper --max-pages 5
@@ -28,7 +31,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-jobseeking}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-jobseeking}
-      CORS_ORIGINS: ${CORS_ORIGINS:-https://jobs.example.com}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://jobs.sengganglabs.my.id}
     depends_on:
       db:
         condition: service_healthy
@@ -53,17 +56,15 @@ services:
       - api
     networks: [internal]
 
+  # Origin router. Only reachable from the host loopback (Cloudflare Tunnel).
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "127.0.0.1:18080:80"
     environment:
-      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env.prod}
-      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
       BASIC_AUTH_USER: ${BASIC_AUTH_USER:-admin}
-      AUTH_HASH: ${AUTH_HASH:?set AUTH_HASH in .env.prod}
+      AUTH_HASH: ${AUTH_HASH:-}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

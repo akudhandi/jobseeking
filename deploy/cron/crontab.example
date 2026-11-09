@@ -1,7 +1,11 @@
 # jobseeking prod maintenance. Edit the path to match your clone.
 # Install:  crontab deploy/cron/crontab.example
 #
+# The scrape job runs every 30 minutes but only scrapes when the last successful
+# run is older than 20h (see deploy/cron/scrape.sh). This survives the sandbox
+# being suspended at the nominal time.
+#
 # min  hour dom mon dow  command
-15 2 * * *   /opt/jobseeking/deploy/cron/scrape.sh  >> /var/log/jobseeking-scrape.log 2>&1
-30 2 * * *   /opt/jobseeking/deploy/cron/backup.sh  >> /var/log/jobseeking-backup.log 2>&1
-45 3 * * 0   /opt/jobseeking/deploy/cron/prune.sh   >> /var/log/jobseeking-prune.log  2>&1
+*/30 * * * *  /data/jobseeking/deploy/cron/scrape.sh  >> /data/jobseeking/data/scrape.log 2>&1
+30 2 * * *    /data/jobseeking/deploy/cron/backup.sh  >> /data/jobseeking/data/backup.log 2>&1
+45 3 * * 0    /data/jobseeking/deploy/cron/prune.sh   >> /data/jobseeking/data/prune.log  2>&1
