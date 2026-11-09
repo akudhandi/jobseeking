@@ -105,12 +105,13 @@ class Fetcher:
 
     Rotation happens per request (a fresh context per fetch), so use
     ``async with Fetcher(...) as f:`` to reuse the underlying browser.
+    Pass ``pool=None`` to fetch directly from the host IP (no proxy).
     """
 
     def __init__(
         self,
         settings: Settings,
-        pool: ProxyPool,
+        pool: ProxyPool | None,
         capsolver: CapsolverClient | None = None,
         *,
         block_assets: bool = True,
@@ -161,7 +162,7 @@ class Fetcher:
         attempts = (retries if retries is not None else self.settings.scrape_max_retries) + 1
         last: FetchResult | None = None
         for attempt in range(1, attempts + 1):
-            proxy = self.pool.next()
+            proxy = self.pool.next() if self.pool is not None else None
             result = await self._attempt(
                 url, proxy, wait_selector=wait_selector, solve_captcha=solve_captcha
             )
@@ -176,7 +177,7 @@ class Fetcher:
     async def fetch_with(
         self,
         url: str,
-        proxy: Proxy,
+        proxy: Proxy | None,
         *,
         wait_selector: str | None = None,
         solve_captcha: bool = False,
@@ -189,14 +190,14 @@ class Fetcher:
     async def _attempt(
         self,
         url: str,
-        proxy: Proxy,
+        proxy: Proxy | None,
         *,
         wait_selector: str | None,
         solve_captcha: bool,
     ) -> FetchResult:
         assert self._browser is not None, "Fetcher.start() not called"
         context = await self._browser.new_context(
-            proxy=proxy.playwright(),
+            proxy=proxy.playwright() if proxy is not None else None,
             user_agent=random.choice(USER_AGENTS),
             locale="id-ID",
             timezone_id="Asia/Jakarta",
@@ -249,7 +250,7 @@ class Fetcher:
         finally:
             await context.close()
 
-    async def _handle_captcha(self, page, proxy: Proxy, notes: list[str]) -> bool:
+    async def _handle_captcha(self, page, proxy: Proxy | None, notes: list[str]) -> bool:
         try:
             challenge = await page.evaluate(CAPTCHA_DETECT_JS)
         except Exception:

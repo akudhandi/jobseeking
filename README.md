@@ -179,6 +179,22 @@ Aktifkan Access **sebelum** hostname, kalau tidak dashboard jadi publik.
 docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm scraper --max-pages 3
 ```
 
+Cek pool proxy lebih dulu (kalau semua baris `FAIL`, proxy-nya yang bermasalah,
+bukan kodenya):
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml --profile tools \
+  run --rm --no-deps --entrypoint python scraper -m jobseeking.diagnostics proxy --limit 5
+```
+Kuota habis biasanya muncul sebagai `HTTP 402 Payment Required` saat CONNECT.
+Sementara menunggu top-up, scrape bisa jalan langsung dari IP box:
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml --profile tools \
+  run --rm --no-deps scraper --max-pages 1 --no-proxy
+# atau untuk cron: EXTRA_ARGS=--no-proxy
+```
+IP box adalah IP datacenter, jadi ini hanya untuk mengisi data awal — volume
+besar akan kena rate-limit LinkedIn.
+
 ### 7. Cron
 ```bash
 chmod +x deploy/cron/*.sh
@@ -187,6 +203,7 @@ crontab deploy/cron/crontab.example
 `scrape.sh` dijalankan tiap 30 menit tapi hanya benar-benar scrape kalau run
 terakhir > 20 jam (`MIN_INTERVAL`). Jadi kalau box sedang suspend saat jadwal,
 tick berikutnya menyusul. `MIN_INTERVAL=0 ./scrape.sh` untuk memaksa.
+`EXTRA_ARGS` diteruskan ke pipeline (mis. `EXTRA_ARGS=--no-proxy`).
 
 ### Update
 ```bash

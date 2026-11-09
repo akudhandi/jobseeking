@@ -74,9 +74,15 @@ async def scrape(args: argparse.Namespace) -> dict[str, int]:
     locations = args.location or config.locations
     max_pages = args.max_pages or config.max_pages
 
-    pool = build_proxy_pool(settings)
+    pool = None if args.no_proxy else build_proxy_pool(settings)
     capsolver = build_capsolver(settings)
-    log.info("proxies=%d capsolver=%s keywords=%d locations=%d", len(pool), bool(capsolver), len(keywords), len(locations))
+    log.info(
+        "proxies=%s capsolver=%s keywords=%d locations=%d",
+        "direct" if pool is None else len(pool),
+        bool(capsolver),
+        len(keywords),
+        len(locations),
+    )
 
     run_id = _open_run(keywords, locations)
     stats = {"found": 0, "new": 0, "updated": 0, "failed": 0, "pages": 0}
@@ -156,6 +162,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-pages", type=int, default=0, help="pages per keyword/location")
     parser.add_argument("--max-jobs", type=int, default=0, help="cap cards processed per search")
     parser.add_argument("--no-detail", action="store_true", help="skip fetching job detail pages")
+    parser.add_argument(
+        "--no-proxy",
+        action="store_true",
+        help="fetch directly from the host IP (use when the proxy pool is unusable)",
+    )
     parser.add_argument("--replay-raw", action="store_true", help="re-parse saved HTML, no network")
     parser.add_argument("--init-db", action="store_true", help="create tables and exit")
     parser.add_argument("--log-level", default="INFO")

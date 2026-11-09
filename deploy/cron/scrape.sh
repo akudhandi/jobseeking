@@ -13,6 +13,7 @@ cd "$ROOT"
 
 MAX_PAGES="${MAX_PAGES:-5}"
 MIN_INTERVAL="${MIN_INTERVAL:-72000}"   # seconds between real runs (20h)
+EXTRA_ARGS="${EXTRA_ARGS:-}"            # e.g. EXTRA_ARGS=--no-proxy
 STAMP="$ROOT/data/.last_scrape"
 
 if [ -f "$STAMP" ]; then
@@ -28,9 +29,10 @@ if [ -f "$STAMP" ]; then
   fi
 fi
 
-echo "[$(date -Is)] scrape start (max-pages=${MAX_PAGES})"
+echo "[$(date -Is)] scrape start (max-pages=${MAX_PAGES} extra='${EXTRA_ARGS}')"
+# shellcheck disable=SC2086  # EXTRA_ARGS is intentionally word-split
 if docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm --no-deps scraper \
-     --max-pages "$MAX_PAGES"; then
+     --max-pages "$MAX_PAGES" $EXTRA_ARGS; then
   mkdir -p "$(dirname "$STAMP")"
   date +%s > "$STAMP"
   echo "[$(date -Is)] scrape done"
