@@ -28,10 +28,8 @@ proxies*.txt
 secrets/
 *.credentials
 
-# Data dumps (large, replayable)
-data/raw/
-data/exports/
-data/backups/
+# Runtime data (raw HTML, exports, backups, logs, scrape stamp) — replayable
+data/
 *.sqlite
 *.sqlite3
 *.db
