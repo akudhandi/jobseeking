@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from jobseeking.db import Base
 from jobseeking.models import Company, Job, Skill
 from jobseeking.records import ParsedJob
-from jobseeking.store import upsert_job
+from jobseeking.store import age_missing_jobs, upsert_job
 
 
 def _session():
@@ -159,3 +159,63 @@ def test_less_specific_location_does_not_downgrade_city():
     assert job.province == "Jawa Timur"
     assert job.is_jatim is True
     assert job.location_raw == "Indonesia"
+
+
+def _record(job_id: str, run_id: int | None = None) -> ParsedJob:
+    return ParsedJob(
+        job_id=job_id,
+        title=f"Developer {job_id}",
+        url=f"https://www.linkedin.com/jobs/view/{job_id}",
+        run_id=run_id,
+    )
+
+
+def test_missing_job_is_retired_after_threshold_and_reactivated_when_seen():
+    session = _session()
+    upsert_job(session, _record("1", run_id=1))
+    upsert_job(session, _record("2", run_id=1))
+    session.commit()
+
+    # Run 2 still returns job 1 only: job 2 has now missed one run.
+    upsert_job(session, _record("1", run_id=2))
+    session.commit()
+    assert age_missing_jobs(session, run_id=2, threshold=3) == {"missed": 1, "retired": 0}
+    session.commit()
+    assert session.scalar(select(Job).where(Job.job_id == "2")).missed_runs == 1
+
+    age_missing_jobs(session, run_id=2, threshold=3)
+    session.commit()
+    retired = session.scalar(select(Job).where(Job.job_id == "2"))
+    assert retired.missed_runs == 2
+    assert retired.is_active is True
+
+    # Third consecutive miss flips it.
+    assert age_missing_jobs(session, run_id=2, threshold=3) == {"missed": 1, "retired": 1}
+    session.commit()
+    retired = session.scalar(select(Job).where(Job.job_id == "2"))
+    assert retired.is_active is False
+    assert retired.missed_runs == 3
+
+    # Showing up again in a later run brings it back and resets the counter.
+    upsert_job(session, _record("2", run_id=3))
+    session.commit()
+    revived = session.scalar(select(Job).where(Job.job_id == "2"))
+    assert revived.is_active is True
+    assert revived.missed_runs == 0
+
+
+def test_missing_job_is_never_deleted():
+    session = _session()
+    upsert_job(session, _record("9", run_id=1))
+    session.commit()
+
+    for _ in range(5):
+        # A later run that does not return this posting (same run_id keeps it
+        # excluded from every sweep).
+        age_missing_jobs(session, run_id=2, threshold=2)
+    session.commit()
+
+    job = session.scalar(select(Job).where(Job.job_id == "9"))
+    assert job is not None
+    assert job.is_active is False
+    assert job.missed_runs == 5

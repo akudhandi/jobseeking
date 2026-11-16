@@ -48,6 +48,8 @@ def job_to_dict(job: Job, *, include_description: bool = False) -> dict:
         "min_years_experience": job.min_years_experience,
         "search_keyword": job.search_keyword,
         "source": job.source,
+        "is_active": job.is_active,
+        "missed_runs": job.missed_runs,
         "skills": [s.slug for s in job.skills],
         "requirements": job.requirements or [],
     }

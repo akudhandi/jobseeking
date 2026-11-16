@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # endpoint flags the data as stale after 1.5x this, so the value must match
     # MIN_INTERVAL in deploy/cron/scrape.sh.
     scrape_interval_hours: float = 20.0
+    # A posting that no longer shows up in the search results is retired (and
+    # hidden from the statistics) after this many consecutive full runs.
+    scrape_misses_before_inactive: int = 3
 
     api_host: str = "127.0.0.1"
     api_port: int = 8000

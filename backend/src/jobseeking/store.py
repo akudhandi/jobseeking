@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from .models import Company, Job, Skill
@@ -51,6 +51,27 @@ def get_or_create_skill(session: Session, slug: str) -> Skill | None:
         session.add(skill)
         session.flush()
     return skill
+
+
+def age_missing_jobs(session: Session, run_id: int, threshold: int) -> dict[str, int]:
+    """Count postings this run did not return and retire the stale ones.
+
+    "Not seen" is decided by ``run_id``: ``upsert_job`` stamps every posting it
+    touched with the current run, so whatever still points elsewhere was absent
+    from the results. Retiring after ``threshold`` consecutive misses tolerates a
+    single truncated or blocked run, and a later sighting reactivates the posting
+    and resets the counter — nothing is ever deleted.
+    """
+    unseen = select(Job).where(or_(Job.run_id.is_(None), Job.run_id != run_id))
+    missed = 0
+    retired = 0
+    for job in session.scalars(unseen):
+        missed += 1
+        job.missed_runs = (job.missed_runs or 0) + 1
+        if job.is_active and job.missed_runs >= threshold:
+            job.is_active = False
+            retired += 1
+    return {"missed": missed, "retired": retired}
 
 
 def upsert_job(session: Session, rec: ParsedJob) -> tuple[Job, bool]:
@@ -114,6 +135,10 @@ def upsert_job(session: Session, rec: ParsedJob) -> tuple[Job, bool]:
 
     if not is_new:
         job.scraped_at = func.now()
+
+    # A posting that shows up in this run is open as far as we can tell.
+    job.missed_runs = 0
+    job.is_active = True
 
     resolved: list[Skill] = []
     for slug in rec.skills:

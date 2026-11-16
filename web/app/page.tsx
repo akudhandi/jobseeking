@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 
 const EMPTY: Overview = {
   total_jobs: 0,
+  inactive_jobs: 0,
   total_companies: 0,
   jobs_with_salary: 0,
   salary_coverage: 0,
@@ -60,7 +61,15 @@ export default async function Page() {
       <HealthBanner health={health} />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-        <KpiCard label="Total lowongan" value={formatNumber(overview.total_jobs)} />
+        <KpiCard
+          label="Total lowongan"
+          value={formatNumber(overview.total_jobs)}
+          hint={
+            overview.inactive_jobs
+              ? `${formatNumber(overview.inactive_jobs)} nonaktif tidak dihitung`
+              : "Semua lowongan masih aktif"
+          }
+        />
         <KpiCard label="Perusahaan" value={formatNumber(overview.total_companies)} />
         <KpiCard
           label="Coverage gaji"

@@ -14,6 +14,8 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    text,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -121,6 +123,15 @@ class Job(Base):
     description_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
     requirements: Mapped[list | None] = mapped_column(JSON, nullable=True)
     min_years_experience: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # LinkedIn keeps a detail page online after a posting closes, so "it still
+    # has a page" proves nothing. A posting missing from
+    # SCRAPE_MISSES_BEFORE_INACTIVE consecutive full runs is retired; seeing it
+    # again reactivates it and resets the counter.
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), index=True
+    )
+    missed_runs: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
 
     search_keyword: Mapped[str | None] = mapped_column(String(255), nullable=True)
     source: Mapped[str] = mapped_column(String(40), default="linkedin")

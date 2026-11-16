@@ -109,6 +109,21 @@ python -m jobseeking.pipeline --replay-raw
   criteria labels are supported and `Tidak berlaku` means `NULL`.
 - **Salary** stays `NULL` when the posting has none; API surfaces
   `salary_coverage` instead of estimating.
+- **Postings are retired, never deleted.** LinkedIn keeps a detail page online
+  after a job closes, so the search results are the only proof a posting is still
+  open. A full-matrix run stamps every posting it saw with its `run_id`; the rest
+  get `missed_runs += 1` and, at `SCRAPE_MISSES_BEFORE_INACTIVE` (default 3)
+  consecutive misses, `is_active = false`. Seeing the posting again resets the
+  counter and reactivates it. Statistics only count active rows and expose
+  `inactive_jobs`, so nothing disappears silently.
+  - Only runs over the whole configured matrix age rows: `--keyword`,
+    `--location`, or `--max-jobs` runs see a subset and would retire everything
+    outside it, so they skip this step.
+  - A failed or empty run never retires anything.
+  - Caveat: the cron caps each search at `MAX_PAGES` (5) while `config.yaml`
+    allows 10, so a posting that consistently ranks below page 5 of every search
+    will be retired even though it is still live. It comes back the moment it
+    ranks higher again; raise `MAX_PAGES` if that matters.
 
 ## API
 

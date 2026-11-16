@@ -68,31 +68,36 @@ def run_to_dict(run: CrawlRun) -> dict[str, Any]:
 
 
 def job_coverage(db: Session) -> dict[str, Any]:
-    """Field coverage over the whole job table.
+    """Field coverage over the postings that are still live.
 
     Nulls are meaningful here: salary/town/criteria are frequently absent from
     the posting itself, so coverage is reported instead of being papered over.
+    Retired postings are excluded, otherwise a field would look better covered
+    just because an old run happened to parse it.
     """
-    total = db.scalar(select(func.count()).select_from(Job)) or 0
+    active = Job.is_active.is_(True)
+    total = db.scalar(select(func.count()).select_from(Job).where(active)) or 0
+    inactive = db.scalar(select(func.count()).select_from(Job).where(Job.is_active.is_(False))) or 0
     salary = (
         db.scalar(
             select(func.count())
             .select_from(Job)
-            .where(or_(Job.salary_min.is_not(None), Job.salary_max.is_not(None)))
+            .where(active, or_(Job.salary_min.is_not(None), Job.salary_max.is_not(None)))
         )
         or 0
     )
     fields = {
-        "city": db.scalar(select(func.count(Job.city))) or 0,
-        "province": db.scalar(select(func.count(Job.province))) or 0,
-        "employment_type": db.scalar(select(func.count(Job.employment_type))) or 0,
-        "seniority": db.scalar(select(func.count(Job.seniority))) or 0,
-        "description": db.scalar(select(func.count(Job.description_raw))) or 0,
-        "experience": db.scalar(select(func.count(Job.min_years_experience))) or 0,
-        "keyword": db.scalar(select(func.count(Job.search_keyword))) or 0,
+        "city": db.scalar(select(func.count(Job.city)).where(active)) or 0,
+        "province": db.scalar(select(func.count(Job.province)).where(active)) or 0,
+        "employment_type": db.scalar(select(func.count(Job.employment_type)).where(active)) or 0,
+        "seniority": db.scalar(select(func.count(Job.seniority)).where(active)) or 0,
+        "description": db.scalar(select(func.count(Job.description_raw)).where(active)) or 0,
+        "experience": db.scalar(select(func.count(Job.min_years_experience)).where(active)) or 0,
+        "keyword": db.scalar(select(func.count(Job.search_keyword)).where(active)) or 0,
     }
     out: dict[str, Any] = {
         "total_jobs": total,
+        "inactive_jobs": inactive,
         "salary": {"count": salary, "percent": _percent(salary, total)},
     }
     for name, count in fields.items():

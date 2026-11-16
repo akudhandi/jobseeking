@@ -20,6 +20,8 @@ export interface JobItem {
   scraped_at: string | null;
   search_keyword: string | null;
   source: string;
+  is_active: boolean;
+  missed_runs: number;
   skills: string[];
   requirements: string[];
   description?: string | null;
@@ -39,6 +41,7 @@ export interface NameCount {
 
 export interface Overview {
   total_jobs: number;
+  inactive_jobs: number;
   total_companies: number;
   jobs_with_salary: number;
   salary_coverage: number;
@@ -90,6 +93,7 @@ export interface ScrapeHealth {
   runs: CrawlRunItem[];
   coverage: {
     total_jobs: number;
+    inactive_jobs: number;
     salary: CoverageEntry;
     city: CoverageEntry;
     province: CoverageEntry;

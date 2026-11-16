@@ -22,7 +22,7 @@ const RUN_STATUS_LABEL: Record<string, string> = {
 };
 
 const COVERAGE_ROWS: {
-  key: Exclude<keyof ScrapeHealth["coverage"], "total_jobs">;
+  key: Exclude<keyof ScrapeHealth["coverage"], "total_jobs" | "inactive_jobs">;
   label: string;
   hint?: string;
 }[] = [
@@ -81,7 +81,9 @@ export default async function RunsPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Kelengkapan data ({formatNumber(health.coverage.total_jobs)} lowongan)</CardTitle>
+                <CardTitle>
+                  Kelengkapan data ({formatNumber(health.coverage.total_jobs)} lowongan aktif)
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {COVERAGE_ROWS.map(({ key, label, hint }) => {

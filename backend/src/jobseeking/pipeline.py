@@ -23,7 +23,7 @@ from .fetch import Fetcher
 from .models import CrawlRun
 from .runtime import build_capsolver, build_proxy_pool
 from .search import JobCard, SearchCrawler, parse_job_cards
-from .store import upsert_job
+from .store import age_missing_jobs, upsert_job
 
 log = logging.getLogger("jobseeking")
 
@@ -66,6 +66,13 @@ def _store_records(records, stats: dict[str, int]) -> None:
                 stats["new" if is_new else "updated"] += 1
 
 
+def _retire_missing(run_id: int) -> dict[str, int]:
+    """Age out postings absent from a complete run (see ``age_missing_jobs``)."""
+    threshold = get_settings().scrape_misses_before_inactive
+    with session_scope() as session:
+        return age_missing_jobs(session, run_id, threshold)
+
+
 async def scrape(args: argparse.Namespace) -> dict[str, int]:
     settings = get_settings()
     config = load_crawl_config()
@@ -73,6 +80,11 @@ async def scrape(args: argparse.Namespace) -> dict[str, int]:
     keywords = args.keyword or config.keywords
     locations = args.location or config.locations
     max_pages = args.max_pages or config.max_pages
+
+    # Only a run over the whole configured matrix may decide that a posting is
+    # gone: a --keyword/--location/--max-jobs run sees a subset and would retire
+    # everything outside it.
+    full_matrix = not (args.keyword or args.location or args.max_jobs)
 
     pool = None if args.no_proxy else build_proxy_pool(settings)
     capsolver = build_capsolver(settings)
@@ -118,6 +130,14 @@ async def scrape(args: argparse.Namespace) -> dict[str, int]:
                     ]
                     _store_records(records, stats)
                     log.info("  stored new=%d updated=%d", stats["new"], stats["updated"])
+
+        # Runs after the fetch loop, so a failed or blocked run never retires
+        # anything: only a completed sweep over the full matrix may imply a
+        # posting is gone.
+        if full_matrix and stats["found"]:
+            aging = _retire_missing(run_id)
+            stats.update(aging)
+            log.info("  missing=%d retired=%d", aging["missed"], aging["retired"])
     except Exception:
         status = "failed"
         raise

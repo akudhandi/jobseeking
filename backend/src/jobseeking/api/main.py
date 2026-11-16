@@ -52,8 +52,12 @@ def _build_filters(
     salary_min: float | None = None,
     salary_max: float | None = None,
     has_salary: bool | None = None,
+    is_active: bool | None = True,
 ) -> list:
     conditions = []
+    # Retired postings are hidden by default; pass is_active=None to see them.
+    if is_active is not None:
+        conditions.append(Job.is_active.is_(is_active))
     if q:
         like = f"%{q}%"
         conditions.append(or_(Job.title.ilike(like), Job.description_raw.ilike(like)))
@@ -130,8 +134,14 @@ def list_runs(
 
 @app.get("/meta")
 def meta(db: Session = Depends(get_db)) -> dict:
+    active = Job.is_active.is_(True)
+
     def distinct(column):
-        return [v for (v,) in db.execute(select(column).distinct().order_by(column)).all() if v]
+        return [
+            v
+            for (v,) in db.execute(select(column).where(active).distinct().order_by(column)).all()
+            if v
+        ]
 
     skill_rows = db.execute(
         select(Skill.slug, Skill.name, Skill.category).order_by(Skill.category, Skill.name)
@@ -163,24 +173,26 @@ def list_jobs(
     salary_min: float | None = None,
     salary_max: float | None = None,
     has_salary: bool | None = None,
+    include_inactive: bool = False,
     sort: str = "recent",
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ) -> dict:
     conditions = _build_filters(
-        q,
-        city,
-        province,
-        is_jatim,
-        work_type,
-        seniority,
-        employment_type,
-        keyword,
-        company,
-        skill,
-        salary_min,
-        salary_max,
-        has_salary,
+        q=q,
+        city=city,
+        province=province,
+        is_jatim=is_jatim,
+        work_type=work_type,
+        seniority=seniority,
+        employment_type=employment_type,
+        keyword=keyword,
+        company=company,
+        skills=skill,
+        salary_min=salary_min,
+        salary_max=salary_max,
+        has_salary=has_salary,
+        is_active=None if include_inactive else True,
     )
     base = _filtered_jobs(*conditions)
 
@@ -221,25 +233,39 @@ def get_job(job_id: str, db: Session = Depends(get_db)) -> dict:
 
 @app.get("/stats/overview")
 def stats_overview(db: Session = Depends(get_db)) -> dict:
-    total = db.scalar(select(func.count()).select_from(Job)) or 0
-    companies = db.scalar(select(func.count()).select_from(Company)) or 0
+    active = Job.is_active.is_(True)
+    total = db.scalar(select(func.count()).select_from(Job).where(active)) or 0
+    inactive = db.scalar(select(func.count()).select_from(Job).where(Job.is_active.is_(False))) or 0
+    companies = (
+        db.scalar(
+            select(func.count(func.distinct(Job.company_id))).where(
+                active, Job.company_id.is_not(None)
+            )
+        )
+        or 0
+    )
     with_salary = (
         db.scalar(
             select(func.count())
             .select_from(Job)
-            .where(or_(Job.salary_min.is_not(None), Job.salary_max.is_not(None)))
+            .where(active, or_(Job.salary_min.is_not(None), Job.salary_max.is_not(None)))
         )
         or 0
     )
-    jatim = db.scalar(select(func.count()).select_from(Job).where(Job.is_jatim.is_(True))) or 0
-    remote = db.scalar(select(func.count()).select_from(Job).where(Job.work_type == "remote")) or 0
-    last_scraped = db.scalar(select(func.max(Job.scraped_at)))
+    jatim = (
+        db.scalar(select(func.count()).select_from(Job).where(active, Job.is_jatim.is_(True))) or 0
+    )
+    remote = (
+        db.scalar(select(func.count()).select_from(Job).where(active, Job.work_type == "remote"))
+        or 0
+    )
+    last_scraped = db.scalar(select(func.max(Job.scraped_at)).where(active))
     coverage = job_coverage(db)
 
     def group(column, limit=20):
         rows = db.execute(
             select(column, func.count().label("count"))
-            .where(column.is_not(None))
+            .where(column.is_not(None), active)
             .group_by(column)
             .order_by(func.count().desc())
             .limit(limit)
@@ -248,6 +274,7 @@ def stats_overview(db: Session = Depends(get_db)) -> dict:
 
     return {
         "total_jobs": total,
+        "inactive_jobs": inactive,
         "total_companies": companies,
         "jobs_with_salary": with_salary,
         "salary_coverage": round(with_salary / total * 100, 1) if total else 0.0,
@@ -287,6 +314,7 @@ def stats_skills(
         stmt = stmt.where(Job.city.ilike(city))
     if keyword:
         stmt = stmt.where(Job.search_keyword == keyword)
+    stmt = stmt.where(Job.is_active.is_(True))
     rows = db.execute(stmt).all()
     return {"items": [{"slug": s, "name": n, "category": c, "count": cnt} for s, n, c, cnt in rows]}
 
@@ -302,6 +330,7 @@ def stats_companies(db: Session = Depends(get_db), limit: int = Query(20, ge=1, 
             func.avg(Job.salary_max).label("avg_max"),
         )
         .join(Job, Job.company_id == Company.id)
+        .where(Job.is_active.is_(True))
         .group_by(Company.id)
         .order_by(func.count(Job.id).desc())
         .limit(limit)
@@ -334,6 +363,7 @@ def _salary_dimension(db: Session, column, min_count: int = 1) -> list[dict]:
         )
         .where(or_(Job.salary_min.is_not(None), Job.salary_max.is_not(None)))
         .where(column.is_not(None))
+        .where(Job.is_active.is_(True))
         .group_by(column)
         .having(func.count(Job.id) >= min_count)
         .order_by(
@@ -359,6 +389,7 @@ def stats_salary(db: Session = Depends(get_db)) -> dict:
     rows = db.execute(
         select(Job.salary_min, Job.salary_max)
         .where(or_(Job.salary_min.is_not(None), Job.salary_max.is_not(None)))
+        .where(Job.is_active.is_(True))
         .limit(50000)
     ).all()
     mids = [
@@ -407,6 +438,7 @@ def stats_trend(db: Session = Depends(get_db)) -> dict:
     rows = db.execute(
         select(bucket.label("bucket"), func.count().label("count"))
         .where(Job.posted_at.is_not(None))
+        .where(Job.is_active.is_(True))
         .group_by("bucket")
         .order_by("bucket")
     ).all()
@@ -418,6 +450,7 @@ def stats_locations(db: Session = Depends(get_db), limit: int = Query(40, ge=1, 
     rows = db.execute(
         select(Job.city, Job.province, Job.is_jatim, func.count().label("count"))
         .where(Job.city.is_not(None))
+        .where(Job.is_active.is_(True))
         .group_by(Job.city, Job.province, Job.is_jatim)
         .order_by(func.count().desc())
         .limit(limit)
@@ -437,8 +470,15 @@ def export_csv(
     city: str | None = None,
     keyword: str | None = None,
     skill: list[str] | None = Query(default=None),
+    include_inactive: bool = False,
 ) -> StreamingResponse:
-    conditions = _build_filters(q=q, city=city, keyword=keyword, skills=skill)
+    conditions = _build_filters(
+        q=q,
+        city=city,
+        keyword=keyword,
+        skills=skill,
+        is_active=None if include_inactive else True,
+    )
     stmt = _filtered_jobs(*conditions).order_by(Job.scraped_at.desc()).limit(50000)
     jobs = db.scalars(stmt).unique().all()
 
