@@ -13,7 +13,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -47,7 +46,8 @@ class Skill(Base):
 
 class JobSkill(Base):
     __tablename__ = "job_skills"
-    __table_args__ = (UniqueConstraint("job_id", "skill_id", name="uq_job_skill"),)
+    # No extra UniqueConstraint here: (job_id, skill_id) is already the primary
+    # key, so a second unique index on the same columns would only be dead weight.
 
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), primary_key=True)
     skill_id: Mapped[int] = mapped_column(

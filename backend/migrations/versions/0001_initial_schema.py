@@ -126,7 +126,6 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["job_id"], ["jobs.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["skill_id"], ["skills.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("job_id", "skill_id"),
-        sa.UniqueConstraint("job_id", "skill_id", name="uq_job_skill"),
     )
 
 
