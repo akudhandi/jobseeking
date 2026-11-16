@@ -120,6 +120,21 @@ def test_health_flags_blocked_scrape_that_found_nothing():
     assert health["status"] == "empty"
 
 
+def test_replay_run_does_not_reset_freshness():
+    """--replay-raw writes a crawl_runs row too; it must not look like a scrape."""
+    session = _session()
+    _run(session, hours_ago=40)
+    replay = _run(session, hours_ago=0.1, pages=0, found=189, new=0)
+    replay.keyword = "(replay)"
+    session.commit()
+
+    health = scrape_health(session)
+    assert health["status"] == "stale"
+    assert health["last_run"]["keywords"] != "(replay)"
+    # History still shows the replay row.
+    assert any(run["keywords"] == "(replay)" for run in health["runs"])
+
+
 def test_coverage_counts_nulls_as_missing():
     session = _session()
     upsert_job(

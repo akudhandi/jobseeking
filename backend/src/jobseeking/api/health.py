@@ -100,6 +100,15 @@ def job_coverage(db: Session) -> dict[str, Any]:
     return out
 
 
+def _is_scrape_run(run: CrawlRun) -> bool:
+    """Replay runs re-parse local HTML and prove nothing about the live site.
+
+    They are recorded in crawl_runs like any other run, so without this filter a
+    backfill would reset the freshness clock and hide a dead scraper.
+    """
+    return not (run.keyword or "").startswith("(replay)")
+
+
 def scrape_health(db: Session, *, recent: int = RECENT_RUNS) -> dict[str, Any]:
     settings = get_settings()
     interval = float(settings.scrape_interval_hours)
@@ -107,8 +116,9 @@ def scrape_health(db: Session, *, recent: int = RECENT_RUNS) -> dict[str, Any]:
     now = datetime.now(UTC)
 
     runs = list(db.scalars(select(CrawlRun).order_by(CrawlRun.id.desc()).limit(recent)).all())
-    last_run = runs[0] if runs else None
-    last_success = next((r for r in runs if r.status == "completed"), None)
+    scrapes = [run for run in runs if _is_scrape_run(run)]
+    last_run = scrapes[0] if scrapes else None
+    last_success = next((r for r in scrapes if r.status == "completed"), None)
 
     last_started_hours = _hours_since(last_run.started_at, now) if last_run else None
     hung = (
@@ -118,7 +128,7 @@ def scrape_health(db: Session, *, recent: int = RECENT_RUNS) -> dict[str, Any]:
     )
 
     consecutive_failures = 0
-    for run in runs:
+    for run in scrapes:
         if run.status == "failed":
             consecutive_failures += 1
         elif run is last_run and run.status == "running" and not hung:
