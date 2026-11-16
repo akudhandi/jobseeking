@@ -77,6 +77,7 @@ def build_parsed_job(
         salary_max=salary.max if salary else None,
         salary_period=salary.period if salary else None,
         salary_currency=salary.currency if salary else "IDR",
+        salary_source=salary.source if salary else None,
         posted_at=posted_at,
         description_raw=description or None,
         requirements=req.items,

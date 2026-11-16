@@ -25,6 +25,7 @@ class ParsedJob:
     salary_max: float | None = None
     salary_period: str | None = None
     salary_currency: str = "IDR"
+    salary_source: str | None = None
 
     posted_at: datetime | None = None
     description_raw: str | None = None

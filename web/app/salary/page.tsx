@@ -39,8 +39,9 @@ export default function SalaryPage() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Gaji</h1>
         <p className="text-sm text-muted-foreground">
-          Estimasi dari nominal yang dicantumkan di lowongan. Nilai kosong = lowongan tidak
-          mencantumkan gaji.
+          Estimasi dari nominal yang dicantumkan di lowongan, diseragamkan ke rupiah per bulan.
+          Gaji mata uang asing dan nilai di luar rentang wajar (Rp 1jt–150jt/bulan) tidak dihitung;
+          nilai kosong berarti lowongan tidak mencantumkan gaji.
         </p>
       </header>
 

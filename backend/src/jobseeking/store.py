@@ -116,6 +116,16 @@ def upsert_job(session: Session, rec: ParsedJob) -> tuple[Job, bool]:
         job.salary_min = rec.salary_min
         job.salary_max = rec.salary_max
         job.salary_period = rec.salary_period
+        job.salary_source = rec.salary_source
+    elif rec.description_raw:
+        # A parsed description that yields no salary is evidence there is none.
+        # Clear whatever an earlier parse stored: the old parser divided monthly
+        # amounts by twelve and treated "20 Min" as 20 million, so keeping that
+        # value because "we already knew a salary" preserves the bug, not data.
+        job.salary_min = None
+        job.salary_max = None
+        job.salary_period = None
+        job.salary_source = None
     job.salary_currency = rec.salary_currency or job.salary_currency
 
     if rec.posted_at is not None:

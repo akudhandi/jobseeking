@@ -189,6 +189,25 @@ def test_less_specific_location_does_not_downgrade_city():
     assert job.location_raw == "Indonesia"
 
 
+def test_parsed_description_without_salary_clears_a_stale_value():
+    """Re-parsing a description that has no salary is evidence the stored value
+    was wrong; keeping it "because we already knew a salary" preserves the bug."""
+    session = _session()
+    upsert_job(session, _full_record())
+    session.commit()
+
+    reparsed = _full_record()
+    reparsed.salary_min = None
+    reparsed.salary_max = None
+    reparsed.salary_period = None
+    reparsed.salary_source = None
+    job, _ = upsert_job(session, reparsed)
+    session.commit()
+
+    assert job.salary_min is None
+    assert job.salary_max is None
+
+
 def _record(job_id: str, run_id: int | None = None) -> ParsedJob:
     return ParsedJob(
         job_id=job_id,

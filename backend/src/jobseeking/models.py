@@ -112,6 +112,10 @@ class Job(Base):
     salary_max: Mapped[float | None] = mapped_column(Float, nullable=True)
     salary_period: Mapped[str | None] = mapped_column(String(20), nullable=True)  # month|year|hour
     salary_currency: Mapped[str] = mapped_column(String(8), default="IDR")
+    # The description line the salary was read from. Free-text parsing can go
+    # wrong, and the raw HTML may be a login wall by the time anyone asks why a
+    # number looks odd, so keep the evidence next to the value.
+    salary_source: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Set on insert, refreshed on every successful re-scrape (last time we saw it).

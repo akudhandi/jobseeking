@@ -116,6 +116,17 @@ python -m jobseeking.pipeline --replay-raw
   criteria labels are supported and `Tidak berlaku` means `NULL`.
 - **Salary** stays `NULL` when the posting has none; API surfaces
   `salary_coverage` instead of estimating.
+- **Salary is normalised to monthly IDR, and only when the text justifies it.**
+  Descriptions are parsed line by line: a line must carry a rupiah amount, or an
+  explicit salary word plus an Indonesian multiplier (`Gaji 8-10 juta`). Hourly,
+  daily, weekly and annual amounts are converted to a monthly figure; anything
+  outside Rp 1jt–150jt/month is dropped, as is any posting priced in a foreign
+  currency (no guessed exchange rates). `jobs.salary_source` keeps the line the
+  number came from so outliers stay auditable after the raw HTML is gone.
+  - The previous parser read the period from the whole description, so
+    `p.a.` matched the `pa` in `pengalaman`/`aplikasi` and divided every monthly
+    salary by twelve; the `m` multiplier also matched the `M` in `20 Min`.
+    Regression tests cover both.
 - **Postings are retired, never deleted.** LinkedIn keeps a detail page online
   after a job closes, so the search results are the only proof a posting is still
   open. A full-matrix run stamps every posting it saw with its `run_id`; the rest

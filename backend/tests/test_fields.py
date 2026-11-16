@@ -49,6 +49,50 @@ def test_salary_none_when_absent():
     assert parse_salary(None) is None
 
 
+def test_salary_monthly_value_is_not_halved_by_annual_words_elsewhere():
+    """The old parser read the period from the whole description, and its "p.a."
+    pattern matched the "pa" in every Indonesian word, so this exact LinkedIn
+    estimate block was divided by twelve."""
+    text = (
+        "Perkiraan rentang gaji yang diberikan Universitas Ciputra Surabaya\n"
+        "Rentang gaji pokok\n"
+        "Rp 6.000.000,00/bln - Rp 10.000.000,00/bln\n"
+        "Responsibilities\n"
+        "Memiliki pengalaman menggunakan aplikasi web"
+    )
+    s = parse_salary(text)
+    assert s is not None
+    assert s.min == 6_000_000
+    assert s.max == 10_000_000
+
+
+def test_salary_ignores_word_initial_multiplier():
+    """ "20 Min" used to become Rp 20.000.000 because "m" matched any word."""
+    assert parse_salary("Application Process (Takes 20 Min)\nEasy Apply on LinkedIn") is None
+
+
+def test_salary_hourly_rate_is_converted_to_month():
+    s = parse_salary("Rate: Rp 50.000/jam")
+    assert s is not None
+    assert s.min == s.max == round(50_000 * 40 * 52 / 12)
+
+
+def test_salary_foreign_currency_is_not_guessed():
+    assert parse_salary("Rentang gaji pokok\nUS$50,00/jam - US$100,00/jam") is None
+    assert parse_salary("Compensation: $50 - $100/hour") is None
+
+
+def test_salary_implausible_monthly_values_are_dropped():
+    assert parse_salary("Rp 1.957.000.000") is None
+    assert parse_salary("Tunjangan: Rp 500.000") is None
+
+
+def test_salary_keeps_the_line_it_came_from():
+    s = parse_salary("Tentang kami\nGaji 8-10 juta per bulan\nLamar sekarang")
+    assert s is not None
+    assert s.source == "Gaji 8-10 juta per bulan"
+
+
 def test_extract_skills():
     text = "Butuh React.js, Node.js, PostgreSQL, Docker, dan developer Go berpengalaman"
     skills = set(extract_skills(text))

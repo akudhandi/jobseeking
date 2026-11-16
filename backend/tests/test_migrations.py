@@ -111,3 +111,32 @@ def test_keyword_column_is_backfilled_into_job_keywords(tmp_path):
         assert "search_keyword" not in {c["name"] for c in inspect(engine).get_columns("jobs")}
 
     engine.dispose()
+
+
+def test_salary_migration_adds_source_and_drops_implausible_values(tmp_path):
+    """0004 removes salaries the parser can no longer justify (the period bug
+    produced values like Rp 163.083.333/month) and keeps sane ones."""
+    url = f"sqlite+pysqlite:///{(tmp_path / 'salary.db').as_posix()}"
+    cfg = _alembic_config(url)
+    command.upgrade(cfg, "0003")
+
+    engine = create_engine(url)
+    insert = (
+        "INSERT INTO jobs (job_id, title, url, is_jatim, work_type, salary_currency,"
+        " source, salary_min, salary_max, salary_period)"
+        " VALUES (:job_id, 'Job', 'u', 0, 'remote', 'IDR', 'linkedin', :lo, :hi, 'month')"
+    )
+    with engine.begin() as conn:
+        conn.execute(text(insert), {"job_id": "ok", "lo": 8_000_000, "hi": 10_000_000})
+        conn.execute(text(insert), {"job_id": "year-bug", "lo": 163_083_333, "hi": 163_083_333})
+
+    command.upgrade(cfg, "head")
+
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT job_id, salary_min, salary_max FROM jobs ORDER BY job_id")
+        ).all()
+        assert rows == [("ok", 8_000_000, 10_000_000), ("year-bug", None, None)]
+        assert "salary_source" in {c["name"] for c in inspect(engine).get_columns("jobs")}
+
+    engine.dispose()

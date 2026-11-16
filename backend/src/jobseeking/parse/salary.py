@@ -1,4 +1,20 @@
-"""Salary extraction from free-text job descriptions (IDR-oriented)."""
+"""Salary extraction from free-text job descriptions (IDR, normalised to monthly).
+
+A job description is not a salary field: it mixes Indonesian and English and is
+full of numbers that are not compensation ("3 tahun pengalaman", "20 juta
+pengguna", "20 Min"). Everything here works line by line and only trusts a line
+that carries a rupiah amount, or an explicit salary word together with an
+Indonesian multiplier ("Gaji 8-10 juta"). The period is read from that line —
+never from the whole description, which is how "Rp 6.000.000,00/bln" used to be
+divided by twelve because "pengalaman" contains "pa" and the old year pattern
+matched any `p.a.` substring.
+
+The result is always monthly IDR. Foreign-currency postings are left empty
+instead of being converted at a guessed exchange rate, and implausible monthly
+values are dropped rather than skewing the averages. ``source`` keeps the line
+the number came from so an outlier can be audited later, even after the raw HTML
+is gone.
+"""
 
 from __future__ import annotations
 
@@ -16,15 +32,50 @@ MULT: dict[str, float] = {
     "k": 1e3,
 }
 
-CUR_WINDOW_RE = re.compile(r"(rp\.?|idr|rupiah)\s*$", re.IGNORECASE)
-PERIOD_YEAR_RE = re.compile(
-    r"(per\s*tahun|per\s*annum|/\s*(tahun|year|yr|annum)\b|p\.?a\.?|annually|yearly)", re.IGNORECASE
+# Rupiah amounts are the only ones that can be trusted without an exchange rate.
+IDR_RE = re.compile(r"(?<![a-z])(?:rp\.?|idr|rupiah)(?![a-z])", re.IGNORECASE)
+FOREIGN_RE = re.compile(r"(?:us\$|usd|sgd|myr|php|thb|eur|gbp|aud|\$|€|£)", re.IGNORECASE)
+SALARY_WORD_RE = re.compile(
+    r"\b(?:gaji|salary|upah|kompensasi|compensation|remunerasi|tunjangan|penghasilan|"
+    r"pendapatan|honor|honorarium|rate|dibayar|dibayarkan|fee)\b",
+    re.IGNORECASE,
 )
-PERIOD_HOUR_RE = re.compile(r"(per\s*jam|/\s*(jam|hour|hr)\b|hourly|/hr)", re.IGNORECASE)
+IDR_MULT_RE = re.compile(r"(?<![a-z])(?:juta|jt|mio|miliar|ribu|rb)(?![a-z])", re.IGNORECASE)
+
+PERIOD_YEAR_RE = re.compile(
+    r"(?<![a-z])(?:per\s*(?:tahun|year|yr|annum)|/\s*(?:tahun|year|yr|annum)|annually|yearly)(?![a-z])"
+    r"|(?<![a-z])p\.a\.?(?![a-z])",
+    re.IGNORECASE,
+)
+PERIOD_HOUR_RE = re.compile(
+    r"(?<![a-z])(?:per\s*(?:jam|hour|hr)|/\s*(?:jam|hour|hr)|hourly)(?![a-z])",
+    re.IGNORECASE,
+)
+PERIOD_DAY_RE = re.compile(
+    r"(?<![a-z])(?:per\s*(?:hari|day)|/\s*(?:hari|day)|daily)(?![a-z])",
+    re.IGNORECASE,
+)
+PERIOD_WEEK_RE = re.compile(
+    r"(?<![a-z])(?:per\s*(?:minggu|week|wk)|/\s*(?:minggu|week|wk)|weekly)(?![a-z])",
+    re.IGNORECASE,
+)
+
+# 40 h/week, 52 weeks, 260 workdays a year — the conventional full-time basis.
+PERIOD_FACTOR: dict[str, float] = {
+    "month": 1.0,
+    "year": 1 / 12,
+    "week": 52 / 12,
+    "day": 260 / 12,
+    "hour": 40 * 52 / 12,
+}
+
+# Monthly gross rupiah a developer posting can plausibly offer. Below this it is
+# an allowance or a typo; above it the number came from some other context.
+MIN_MONTHLY = 1_000_000
+MAX_MONTHLY = 150_000_000
 
 NUMBER_RE = re.compile(
-    r"(?P<num>\d[\d.,]*)"
-    r"\s*(?P<mult>juta|jt|mio|ribu|rb|miliar|k|m)?",
+    r"(?P<num>\d[\d.,]*)\s*(?:(?P<mult>juta|jt|mio|miliar|ribu|rb|k|m)(?![a-z]))?",
     re.IGNORECASE,
 )
 SEP_RE = re.compile(r"\s*(?:-|–|—|to|s/d|s\.?d|sampai|hingga|s\.d\.)\s*", re.IGNORECASE)
@@ -34,8 +85,9 @@ SEP_RE = re.compile(r"\s*(?:-|–|—|to|s/d|s\.?d|sampai|hingga|s\.d\.)\s*", re
 class SalaryRange:
     min: float | None
     max: float | None
-    period: str = "month"  # month | year | hour
+    period: str = "month"  # always "month": values are normalised before storage
     currency: str = "IDR"
+    source: str | None = None
 
 
 def _to_number(num: str) -> float:
@@ -60,6 +112,10 @@ def _detect_period(text: str) -> str:
         return "year"
     if PERIOD_HOUR_RE.search(text):
         return "hour"
+    if PERIOD_DAY_RE.search(text):
+        return "day"
+    if PERIOD_WEEK_RE.search(text):
+        return "week"
     return "month"
 
 
@@ -83,10 +139,11 @@ def _extract_values(text: str) -> list[float]:
 
     values: list[float] = []
     for group in groups:
-        has_cur = any(CUR_WINDOW_RE.search(text[max(0, m.start() - 8) : m.start()]) for m in group)
+        has_cur = any(IDR_RE.search(text[max(0, m.start() - 10) : m.start()]) for m in group)
         group_mult = next(
             (MULT[m.group("mult").lower()] for m in reversed(group) if m.group("mult")), None
         )
+        # A bare number ("20 Min", "3 tahun") is never a salary on its own.
         if not has_cur and group_mult is None:
             continue
         for m in group:
@@ -95,24 +152,38 @@ def _extract_values(text: str) -> list[float]:
     return values
 
 
+def _is_candidate(line: str) -> bool:
+    if FOREIGN_RE.search(line):
+        return False
+    if IDR_RE.search(line):
+        return True
+    # "Gaji 8-10 juta" is common enough to accept without the "Rp" prefix.
+    return bool(SALARY_WORD_RE.search(line) and IDR_MULT_RE.search(line))
+
+
 def parse_salary(text: str | None) -> SalaryRange | None:
     if not text:
         return None
-    t = text.lower().replace("\u00a0", " ").replace("\u2022", " ")
-    period = _detect_period(t)
+    clean = text.replace("\u00a0", " ").replace("\u2022", " ")
+    lines = [line.strip() for line in clean.splitlines() if line.strip()]
 
-    values = _extract_values(t)
-    if not values:
-        return None
+    for index, line in enumerate(lines):
+        if not _is_candidate(line):
+            continue
+        # A range split across two lines ("Gaji pokok" / "Rp ... per tahun") carries
+        # its period on the neighbour, so widen the window for period detection.
+        window = line if index + 1 >= len(lines) else f"{line} {lines[index + 1]}"
+        factor = PERIOD_FACTOR[_detect_period(window)]
 
-    floor = {"month": 300_000, "year": 6_000_000, "hour": 5_000}[period]
-    ceiling = {"month": 2_000_000_000, "year": 24_000_000_000, "hour": 10_000_000}[period]
-    values = [v for v in values if floor <= v <= ceiling]
-    if not values:
-        return None
-
-    lo, hi = min(values), max(values)
-    if period == "year":
-        lo, hi = lo / 12, hi / 12
-        period = "month"
-    return SalaryRange(min=round(lo), max=round(hi), period=period, currency="IDR")
+        monthly = [round(value * factor) for value in _extract_values(line)]
+        monthly = [value for value in monthly if MIN_MONTHLY <= value <= MAX_MONTHLY]
+        if not monthly:
+            continue
+        return SalaryRange(
+            min=min(monthly),
+            max=max(monthly),
+            period="month",
+            currency="IDR",
+            source=line[:400],
+        )
+    return None

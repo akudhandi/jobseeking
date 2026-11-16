@@ -55,4 +55,5 @@ def job_to_dict(job: Job, *, include_description: bool = False) -> dict:
     }
     if include_description:
         data["description"] = job.description_raw
+        data["salary_source"] = job.salary_source
     return data
