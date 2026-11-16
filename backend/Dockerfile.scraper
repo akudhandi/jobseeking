@@ -11,7 +11,12 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 COPY src ./src
+# libatomic1 is required by playwright's bundled node driver *before*
+# `playwright install --with-deps` can run (newer playwright versions fail with
+# "error while loading shared libraries: libatomic.so.1" otherwise).
 RUN pip install . \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends libatomic1 \
     && playwright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/*
 
