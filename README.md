@@ -86,6 +86,25 @@ python -m jobseeking.pipeline --keyword "backend developer" --location "Surabaya
 python -m jobseeking.pipeline --replay-raw
 ```
 
+### Data quality rules
+
+- **Upsert merges, never replaces.** A run whose detail fetch is blocked still
+  yields the search card; that card must not blank description, salary, skills,
+  keyword, or a known city. `--replay-raw` is therefore safe for backfills.
+- **Location** prefers the most specific candidate: a guest detail page often
+  says only `Indonesia` while the search card knows the city. City/province are
+  never downgraded to unknown. `kecamatan`-level values are mapped to their
+  kota (`DISTRICT_CITY`), province names are not cities.
+- **Cities stay `NULL` for remote jobs.** LinkedIn reports country-level
+  location (`Indonesia`, sometimes `Jawa Timur, Indonesia`) for remote
+  postings, so ~70% of current rows have no city. That is real absence of data,
+  not a parse failure — report city coverage next to the city breakdown.
+- **`employment_type`** is a canonical enum (`full_time`, `part_time`,
+  `contract`, `temporary`, `internship`, `volunteer`, `other`). Indonesian
+  criteria labels are supported and `Tidak berlaku` means `NULL`.
+- **Salary** stays `NULL` when the posting has none; API surfaces
+  `salary_coverage` instead of estimating.
+
 ## API
 
 ```bash
