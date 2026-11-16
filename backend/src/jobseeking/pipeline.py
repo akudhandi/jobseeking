@@ -22,7 +22,7 @@ from .detail import DetailCrawler, parse_job_detail
 from .fetch import Fetcher
 from .models import CrawlRun
 from .runtime import build_capsolver, build_proxy_pool
-from .search import SearchCrawler, parse_job_cards
+from .search import JobCard, SearchCrawler, parse_job_cards
 from .store import upsert_job
 
 log = logging.getLogger("jobseeking")
@@ -144,6 +144,24 @@ def replay(args: argparse.Namespace) -> dict[str, int]:
     for path in rawstore.list_raw("detail"):
         job_id = path.stem
         details[job_id] = parse_job_detail(rawstore.read_raw(path), job_id)
+
+    # A saved detail page is also proof of a job. Search HTML is overwritten by
+    # later runs, so older jobs may only have their detail page left on disk;
+    # synthesise the card instead of skipping them.
+    for job_id, detail in details.items():
+        if job_id in seen:
+            continue
+        seen.add(job_id)
+        cards.append(
+            JobCard(
+                job_id=job_id,
+                title=detail.title,
+                company=detail.company,
+                location=detail.location,
+                url=f"https://www.linkedin.com/jobs/view/{job_id}",
+                posted_at=detail.posted_at,
+            )
+        )
 
     run_id = _open_run(["(replay)"], ["(raw)"])
     stats = {"found": len(cards), "new": 0, "updated": 0, "failed": 0, "pages": 0}
