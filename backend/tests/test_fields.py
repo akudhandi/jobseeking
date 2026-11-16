@@ -71,6 +71,15 @@ def test_detect_seniority():
     assert detect_seniority(title="Backend Developer") == "unknown"
 
 
+def test_detect_seniority_indonesian_levels():
+    # locale id-ID makes LinkedIn answer with Indonesian level names.
+    assert detect_seniority(level="Tingkat menengah sampai senior") == "mid"
+    assert detect_seniority(level="Tingkat senior") == "senior"
+    assert detect_seniority(level="Tingkat pemula") == "junior"
+    assert detect_seniority(level="Magang") == "intern"
+    assert detect_seniority(level="Direktur") == "lead"
+
+
 def test_parse_location():
     loc = parse_location("Surabaya, East Java, Indonesia", ["Surabaya", "Malang"])
     assert loc.city == "Surabaya"
@@ -96,6 +105,31 @@ def test_parse_location_normalizes_city_names():
     assert parse_location("Kab. Sidoarjo, Jawa Timur", cities).city == "Sidoarjo"
     assert parse_location("Surabaya dan Sekitarnya", cities).city == "Surabaya"
     assert parse_location("surabaya, east java", cities).city == "Surabaya"
+
+
+def test_parse_location_maps_kecamatan_to_city():
+    cities = ["Malang", "Sidoarjo", "Surabaya", "Gresik"]
+    loc = parse_location("Kecamatan Blimbing, Jawa Timur, Indonesia", cities)
+    assert loc.city == "Malang"
+    assert loc.is_jatim is True
+
+    assert parse_location("Kec. Waru, Jawa Timur", cities).city == "Sidoarjo"
+    assert parse_location("Kelurahan Gubeng, Jawa Timur", cities).city == "Surabaya"
+
+    # Unknown district: keep it verbatim instead of guessing a city.
+    assert parse_location("Kecamatan Laren, Jawa Timur", cities).city == "Laren"
+
+
+def test_parse_location_province_is_not_a_city():
+    cities = ["Malang", "Surabaya"]
+    loc = parse_location("Jawa Timur, Indonesia", cities)
+    assert loc.city is None
+    assert loc.province == "Jawa Timur"
+    assert loc.is_jatim is True
+
+    loc2 = parse_location("East Java", cities)
+    assert loc2.city is None
+    assert loc2.is_jatim is True
 
 
 def test_language_slugs_do_not_collide():
@@ -147,6 +181,6 @@ def test_build_parsed_job():
     assert rec.is_jatim is True
     assert rec.salary_min == 10_000_000
     assert rec.seniority == "mid"
-    assert rec.employment_type == "Full-time"
+    assert rec.employment_type == "full_time"
     assert {"node-js", "postgresql", "docker"} <= set(rec.skills)
     assert rec.posted_at is not None

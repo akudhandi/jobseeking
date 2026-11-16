@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from bs4 import BeautifulSoup, Tag
@@ -32,13 +33,73 @@ def _text(node: Tag | None) -> str:
     return node.get_text(" ", strip=True) if node else ""
 
 
-def _criteria(soup: BeautifulSoup) -> dict[str, str]:
-    out: dict[str, str] = {}
+# The crawl runs with locale=id-ID, so LinkedIn usually answers with Indonesian
+# criteria labels ("Tingkat senioritas", "Jenis pekerjaan", ...). Match both
+# languages and map everything onto one internal key per criterion.
+CRITERIA_LABELS: dict[str, str] = {
+    "seniority level": "seniority",
+    "tingkat senioritas": "seniority",
+    "employment type": "employment_type",
+    "jenis pekerjaan": "employment_type",
+    "job function": "job_function",
+    "fungsi pekerjaan": "job_function",
+    "industries": "industries",
+    "industri": "industries",
+}
+
+# Values LinkedIn uses to mean "no data" — they must not become literal enums.
+EMPTY_VALUES = {"", "-", "n/a", "na", "not applicable", "tidak berlaku", "tidak ditentukan"}
+
+EMPLOYMENT_TYPES: dict[str, str] = {
+    "full-time": "full_time",
+    "full time": "full_time",
+    "penuh waktu": "full_time",
+    "part-time": "part_time",
+    "part time": "part_time",
+    "paruh waktu": "part_time",
+    "contract": "contract",
+    "kontrak": "contract",
+    "temporary": "temporary",
+    "sementara": "temporary",
+    "internship": "internship",
+    "magang": "internship",
+    "volunteer": "volunteer",
+    "relawan": "volunteer",
+    "other": "other",
+    "lainnya": "other",
+}
+
+
+def _clean_value(value: str | None) -> str | None:
+    """Trim a criteria value and turn LinkedIn's placeholders into None."""
+    if value is None:
+        return None
+    cleaned = value.strip().strip(":").strip()
+    if cleaned.lower() in EMPTY_VALUES:
+        return None
+    return cleaned
+
+
+def canonical_employment_type(value: str | None) -> str | None:
+    """Map "Penuh waktu" / "Full-time" onto one stable enum for analytics."""
+    cleaned = _clean_value(value)
+    if cleaned is None:
+        return None
+    key = cleaned.lower()
+    if key in EMPLOYMENT_TYPES:
+        return EMPLOYMENT_TYPES[key]
+    # Unknown wording: keep it machine-friendly instead of dropping information.
+    return re.sub(r"[^a-z0-9]+", "_", key).strip("_")[:40] or None
+
+
+def _criteria(soup: BeautifulSoup) -> dict[str, str | None]:
+    out: dict[str, str | None] = {}
     for item in soup.select("li.description__job-criteria-item"):
-        label = _text(item.select_one("h3, .description__job-criteria-subheader")).strip(":").lower()
-        value = _text(item.select_one("span, .description__job-criteria-text"))
-        if label:
-            out[label] = value
+        raw_label = _text(item.select_one("h3, .description__job-criteria-subheader"))
+        key = CRITERIA_LABELS.get(raw_label.strip().strip(":").lower())
+        if key is None:
+            continue
+        out[key] = _clean_value(_text(item.select_one("span, .description__job-criteria-text")))
     return out
 
 
@@ -72,9 +133,9 @@ def parse_job_detail(html: str, job_id: str) -> JobDetail:
         location=location,
         description_html=description_html,
         description_text=description_text,
-        seniority_level=criteria.get("seniority level"),
-        employment_type=criteria.get("employment type"),
-        job_function=criteria.get("job function"),
+        seniority_level=criteria.get("seniority"),
+        employment_type=canonical_employment_type(criteria.get("employment_type")),
+        job_function=criteria.get("job_function"),
         industries=criteria.get("industries"),
         posted_at=str(time_el.get("datetime")) if time_el and time_el.get("datetime") else None,
     )

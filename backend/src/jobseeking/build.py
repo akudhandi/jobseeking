@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .config import CrawlConfig
-from .detail import JobDetail
+from .detail import JobDetail, canonical_employment_type
 from .normalize import parse_datetime
 from .parse import (
     detect_seniority,
@@ -53,7 +53,7 @@ def build_parsed_job(
         province=loc.province,
         is_jatim=loc.is_jatim,
         work_type=work_type,
-        employment_type=(detail.employment_type if detail else None) or None,
+        employment_type=canonical_employment_type(detail.employment_type if detail else None),
         seniority=seniority,
         salary_min=salary.min if salary else None,
         salary_max=salary.max if salary else None,

@@ -12,11 +12,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from . import rawstore
 from .build import build_parsed_job
-from .config import CrawlConfig, get_settings, load_crawl_config
+from .config import get_settings, load_crawl_config
 from .db import init_db, session_scope
 from .detail import DetailCrawler, parse_job_detail
 from .fetch import Fetcher
@@ -45,7 +45,7 @@ def _close_run(run_id: int, stats: dict[str, int], status: str = "completed") ->
         run = session.get(CrawlRun, run_id)
         if run is None:
             return
-        run.finished_at = datetime.now(timezone.utc)
+        run.finished_at = datetime.now(UTC)
         run.pages_fetched = stats.get("pages", 0)
         run.jobs_found = stats["found"]
         run.jobs_new = stats["new"]
@@ -97,12 +97,13 @@ async def scrape(args: argparse.Namespace) -> dict[str, int]:
             for keyword in keywords:
                 for location in locations:
                     log.info("search keyword=%r location=%r", keyword, location)
-                    cards = await search.crawl(keyword, location, max_pages=max_pages)
+                    result = await search.crawl(keyword, location, max_pages=max_pages)
+                    cards = result.cards
                     if args.max_jobs:
                         cards = cards[: args.max_jobs]
                     stats["found"] += len(cards)
-                    stats["pages"] += max_pages
-                    log.info("  cards=%d", len(cards))
+                    stats["pages"] += result.pages
+                    log.info("  cards=%d pages=%d", len(cards), result.pages)
 
                     details = {}
                     if fetch_detail:

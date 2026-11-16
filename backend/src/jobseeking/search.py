@@ -25,6 +25,14 @@ class JobCard:
     posted_at: str | None = None
 
 
+@dataclass
+class SearchResult:
+    """Cards for one keyword/location plus how many pages were really fetched."""
+
+    cards: list[JobCard]
+    pages: int = 0
+
+
 def build_search_url(keyword: str, location: str, start: int = 0, distance: int = 25) -> str:
     params = {
         "keywords": keyword,
@@ -101,18 +109,20 @@ class SearchCrawler:
 
     async def crawl(
         self, keyword: str, location: str, max_pages: int | None = None
-    ) -> list[JobCard]:
+    ) -> SearchResult:
         pages = max_pages if max_pages is not None else self.config.max_pages
         per_page = self.config.results_per_page
         distance = self.config.distance
 
         found: list[JobCard] = []
         seen: set[str] = set()
+        fetched = 0
 
         for page in range(pages):
             start = page * per_page
             url = build_search_url(keyword, location, start=start, distance=distance)
             result = await self.fetcher.fetch(url)
+            fetched += 1
             if self.config.save_raw:
                 rawstore.save_raw("search", f"{keyword}__{location}__{start}", result.body)
             if result.blocked and not result.body:
@@ -132,4 +142,4 @@ class SearchCrawler:
                 break
             await polite_delay(self.settings)
 
-        return found
+        return SearchResult(cards=found, pages=fetched)

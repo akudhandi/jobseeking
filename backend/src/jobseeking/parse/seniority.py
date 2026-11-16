@@ -16,6 +16,15 @@ LEVEL_MAP: dict[str, str] = {
     "director": "lead",
     "executive": "lead",
     "not applicable": "unknown",
+    # LinkedIn dengan locale id-ID mengirim label/level versi Indonesia.
+    "magang": "intern",
+    "tingkat pemula": "junior",
+    "tingkat menengah": "mid",
+    "tingkat menengah sampai senior": "mid",
+    "tingkat senior": "senior",
+    "direktur": "lead",
+    "eksekutif": "lead",
+    "tidak berlaku": "unknown",
 }
 
 TITLE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [

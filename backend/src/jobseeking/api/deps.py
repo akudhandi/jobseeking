@@ -44,6 +44,8 @@ def job_to_dict(job: Job, *, include_description: bool = False) -> dict:
         "has_salary": job.salary_min is not None or job.salary_max is not None,
         "posted_at": _iso(job.posted_at),
         "scraped_at": _iso(job.scraped_at),
+        "updated_at": _iso(job.updated_at),
+        "min_years_experience": job.min_years_experience,
         "search_keyword": job.search_keyword,
         "source": job.source,
         "skills": [s.slug for s in job.skills],

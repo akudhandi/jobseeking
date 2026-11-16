@@ -112,10 +112,15 @@ class Job(Base):
     salary_currency: Mapped[str] = mapped_column(String(8), default="IDR")
 
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set on insert, refreshed on every successful re-scrape (last time we saw it).
     scraped_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     description_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
     requirements: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    min_years_experience: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     search_keyword: Mapped[str | None] = mapped_column(String(255), nullable=True)
     source: Mapped[str] = mapped_column(String(40), default="linkedin")
