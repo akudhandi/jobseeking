@@ -480,9 +480,18 @@ def stats_salary(db: Session = Depends(get_db)) -> dict:
             "median": round(statistics.median(values)),
         }
 
+    overall = summary(mids)
+    if overall:
+        # The headline range is what postings actually offer, not the range of
+        # their midpoints (which made 6jt-10jt postings report "8jt-8,5jt").
+        if mins:
+            overall["min"] = round(min(mins))
+        if maxs:
+            overall["max"] = round(max(maxs))
+
     return {
         "sample_size": len(mids),
-        "overall": summary(mids),
+        "overall": overall,
         "salary_min": summary(mins),
         "salary_max": summary(maxs),
         "distribution": [
