@@ -22,7 +22,9 @@ PROVINCE_ALIASES: dict[str, str] = {
     "jawa": "Jawa",
 }
 
-REMOTE_RE = re.compile(r"\b(remote|wfh|work from home|kerja dari rumah|remote work|fully remote)\b", re.I)
+REMOTE_RE = re.compile(
+    r"\b(remote|wfh|work from home|kerja dari rumah|remote work|fully remote)\b", re.I
+)
 HYBRID_RE = re.compile(r"\b(hybrid|hibrida|sebagian remote)\b", re.I)
 ONSITE_RE = re.compile(r"\b(onsite|on-site|on site|wfo|work from office|di kantor)\b", re.I)
 

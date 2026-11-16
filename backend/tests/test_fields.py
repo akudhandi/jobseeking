@@ -146,7 +146,9 @@ def test_detect_work_type():
 
 
 def test_parse_requirements():
-    desc = "Kualifikasi:\n- Minimal S1 Teknik Informatika\n- 3 tahun pengalaman\n- Menguasai Node.js\n"
+    desc = (
+        "Kualifikasi:\n- Minimal S1 Teknik Informatika\n- 3 tahun pengalaman\n- Menguasai Node.js\n"
+    )
     req = parse_requirements(desc)
     assert any("Node.js" in item for item in req.items)
     assert req.min_years == 3

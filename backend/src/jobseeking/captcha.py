@@ -106,7 +106,9 @@ class CapsolverClient:
         )
         data = r.json()
         if data.get("errorId"):
-            raise CapsolverError(f"createTask failed: {data.get('errorDescription')} ({task['type']})")
+            raise CapsolverError(
+                f"createTask failed: {data.get('errorDescription')} ({task['type']})"
+            )
         return data
 
     async def _poll(self, client: httpx.AsyncClient, task_id: str) -> str:

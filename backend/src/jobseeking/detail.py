@@ -141,7 +141,9 @@ def parse_job_detail(html: str, job_id: str) -> JobDetail:
     if not location:
         location = _text(soup.select_one(".topcard__flavor"))
 
-    desc = soup.select_one(".show-more-less-html__markup, .description__text, .decorated-job-posting__details")
+    desc = soup.select_one(
+        ".show-more-less-html__markup, .description__text, .decorated-job-posting__details"
+    )
     description_html = str(desc) if desc else ""
     description_text = desc.get_text("\n", strip=True) if desc else ""
 

@@ -51,7 +51,9 @@ async def check_linkedin() -> None:
     url = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=backend%20developer&location=Jawa%20Timur%2C%20Indonesia&start=0"
     async with Fetcher(settings, pool, capsolver) as fetcher:
         result = await fetcher.fetch(url, retries=1)
-        print(f"status={result.status} blocked={result.blocked} captcha_solved={result.captcha_solved}")
+        print(
+            f"status={result.status} blocked={result.blocked} captcha_solved={result.captcha_solved}"
+        )
         print(f"proxy={result.proxy.redacted() if result.proxy else '-'} len={len(result.body)}")
         print(f"notes={result.notes}")
         print("--- preview ---")

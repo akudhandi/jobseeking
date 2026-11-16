@@ -265,9 +265,7 @@ class Fetcher:
         notes.append(f"captcha: {kind}")
         try:
             if kind == "recaptcha":
-                token = await self.capsolver.solve_recaptcha_v2(
-                    page.url, sitekey, proxy=proxy
-                )
+                token = await self.capsolver.solve_recaptcha_v2(page.url, sitekey, proxy=proxy)
             elif kind == "hcaptcha":
                 token = await self.capsolver.solve_hcaptcha(page.url, sitekey, proxy=proxy)
             else:
@@ -300,4 +298,6 @@ async def _abort_assets(route) -> None:
 
 
 async def polite_delay(settings: Settings, factor: float = 1.0) -> None:
-    await asyncio.sleep(random.uniform(settings.scrape_delay_min, settings.scrape_delay_max) * factor)
+    await asyncio.sleep(
+        random.uniform(settings.scrape_delay_min, settings.scrape_delay_max) * factor
+    )

@@ -224,7 +224,9 @@ _ALIAS_RE = re.compile(
 _cs_pairs = [(a, d.slug) for d in SKILL_DEFS for a in d.cs_aliases]
 _cs_pairs.sort(key=lambda p: len(p[0]), reverse=True)
 _CS_RE = (
-    re.compile(r"(?<![A-Za-z0-9])(" + "|".join(re.escape(a) for a, _ in _cs_pairs) + r")(?![A-Za-z0-9])")
+    re.compile(
+        r"(?<![A-Za-z0-9])(" + "|".join(re.escape(a) for a, _ in _cs_pairs) + r")(?![A-Za-z0-9])"
+    )
     if _cs_pairs
     else None
 )

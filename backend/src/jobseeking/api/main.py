@@ -143,14 +143,27 @@ def list_jobs(
     offset: int = Query(0, ge=0),
 ) -> dict:
     conditions = _build_filters(
-        q, city, province, is_jatim, work_type, seniority, employment_type, keyword,
-        company, skill, salary_min, salary_max, has_salary,
+        q,
+        city,
+        province,
+        is_jatim,
+        work_type,
+        seniority,
+        employment_type,
+        keyword,
+        company,
+        skill,
+        salary_min,
+        salary_max,
+        has_salary,
     )
     base = _filtered_jobs(*conditions)
 
     count_stmt = select(func.count(func.distinct(Job.id))).select_from(Job)
     if conditions:
-        count_stmt = count_stmt.join(Company, Job.company_id == Company.id, isouter=True).where(*conditions)
+        count_stmt = count_stmt.join(Company, Job.company_id == Company.id, isouter=True).where(
+            *conditions
+        )
     total = db.scalar(count_stmt) or 0
 
     if sort == "salary":
@@ -185,11 +198,14 @@ def get_job(job_id: str, db: Session = Depends(get_db)) -> dict:
 def stats_overview(db: Session = Depends(get_db)) -> dict:
     total = db.scalar(select(func.count()).select_from(Job)) or 0
     companies = db.scalar(select(func.count()).select_from(Company)) or 0
-    with_salary = db.scalar(
-        select(func.count()).select_from(Job).where(
-            or_(Job.salary_min.is_not(None), Job.salary_max.is_not(None))
+    with_salary = (
+        db.scalar(
+            select(func.count())
+            .select_from(Job)
+            .where(or_(Job.salary_min.is_not(None), Job.salary_max.is_not(None)))
         )
-    ) or 0
+        or 0
+    )
     jatim = db.scalar(select(func.count()).select_from(Job).where(Job.is_jatim.is_(True))) or 0
     remote = db.scalar(select(func.count()).select_from(Job).where(Job.work_type == "remote")) or 0
     last_scraped = db.scalar(select(func.max(Job.scraped_at)))
@@ -283,13 +299,17 @@ def _salary_dimension(db: Session, column, min_count: int = 1) -> list[dict]:
             func.count(Job.id).label("count"),
             func.avg(Job.salary_min).label("avg_min"),
             func.avg(Job.salary_max).label("avg_max"),
-            func.avg((Job.salary_min + func.coalesce(Job.salary_max, Job.salary_min)) / 2).label("avg_mid"),
+            func.avg((Job.salary_min + func.coalesce(Job.salary_max, Job.salary_min)) / 2).label(
+                "avg_mid"
+            ),
         )
         .where(or_(Job.salary_min.is_not(None), Job.salary_max.is_not(None)))
         .where(column.is_not(None))
         .group_by(column)
         .having(func.count(Job.id) >= min_count)
-        .order_by(func.avg((Job.salary_min + func.coalesce(Job.salary_max, Job.salary_min)) / 2).desc())
+        .order_by(
+            func.avg((Job.salary_min + func.coalesce(Job.salary_max, Job.salary_min)) / 2).desc()
+        )
         .limit(30)
     )
     rows = db.execute(stmt).all()
@@ -397,20 +417,41 @@ def export_csv(
     writer = csv.writer(buffer)
     writer.writerow(
         [
-            "job_id", "title", "company", "city", "province", "is_jatim", "work_type",
-            "seniority", "employment_type", "salary_min", "salary_max", "salary_period",
-            "posted_at", "skills", "url",
+            "job_id",
+            "title",
+            "company",
+            "city",
+            "province",
+            "is_jatim",
+            "work_type",
+            "seniority",
+            "employment_type",
+            "salary_min",
+            "salary_max",
+            "salary_period",
+            "posted_at",
+            "skills",
+            "url",
         ]
     )
     for job in jobs:
         writer.writerow(
             [
-                job.job_id, job.title, job.company.name_raw if job.company else "",
-                job.city or "", job.province or "", job.is_jatim, job.work_type,
-                job.seniority or "", job.employment_type or "",
-                job.salary_min or "", job.salary_max or "", job.salary_period or "",
+                job.job_id,
+                job.title,
+                job.company.name_raw if job.company else "",
+                job.city or "",
+                job.province or "",
+                job.is_jatim,
+                job.work_type,
+                job.seniority or "",
+                job.employment_type or "",
+                job.salary_min or "",
+                job.salary_max or "",
+                job.salary_period or "",
                 job.posted_at.isoformat() if job.posted_at else "",
-                "|".join(s.slug for s in job.skills), job.url,
+                "|".join(s.slug for s in job.skills),
+                job.url,
             ]
         )
     buffer.seek(0)

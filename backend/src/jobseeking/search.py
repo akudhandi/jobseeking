@@ -48,10 +48,16 @@ def _extract_job_id(card: Tag) -> str | None:
     match = re.search(r"jobPosting:(\d+)", str(urn))
     if match:
         return match.group(1)
-    link = card.select_one("a.base-card__full-link, a[href*='/jobs/view/'], a[href*='currentJobId=']")
+    link = card.select_one(
+        "a.base-card__full-link, a[href*='/jobs/view/'], a[href*='currentJobId=']"
+    )
     if link:
         href = str(link.get("href") or "")
-        for pattern in (r"/jobs/view/(?:[^/?]*-)?(\d+)", r"currentJobId=(\d+)", r"jobPosting:(\d+)"):
+        for pattern in (
+            r"/jobs/view/(?:[^/?]*-)?(\d+)",
+            r"currentJobId=(\d+)",
+            r"jobPosting:(\d+)",
+        ):
             match = re.search(pattern, href)
             if match:
                 return match.group(1)
