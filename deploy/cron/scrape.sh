@@ -15,6 +15,25 @@ MAX_PAGES="${MAX_PAGES:-5}"
 MIN_INTERVAL="${MIN_INTERVAL:-72000}"   # seconds between real runs (20h)
 EXTRA_ARGS="${EXTRA_ARGS:-}"            # e.g. EXTRA_ARGS=--no-proxy
 STAMP="$ROOT/data/.last_scrape"
+LOCK="$ROOT/data/.scrape.lock"
+
+mkdir -p "$ROOT/data"
+
+# One run at a time. The interval check below only sees the stamp written when a
+# run *finishes*, so a scrape that takes 35 minutes would otherwise be started
+# again by the next 30-minute tick — two crawlers hitting LinkedIn from the same
+# IP at double the rate. flock releases automatically if the script is killed.
+exec 9>"$LOCK"
+if ! flock -n 9; then
+  echo "[$(date -Is)] scrape skipped (another scrape script is still running)"
+  exit 0
+fi
+
+# A scraper container started by hand would not hold the flock, so check it too.
+if docker ps --format '{{.Names}}' | grep -q '^jobseeking-prod-scraper'; then
+  echo "[$(date -Is)] scrape skipped (scraper container still running)"
+  exit 0
+fi
 
 if [ -f "$STAMP" ]; then
   last="$(cat "$STAMP" 2>/dev/null || echo 0)"
