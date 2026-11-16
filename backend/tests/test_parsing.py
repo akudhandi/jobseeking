@@ -140,5 +140,9 @@ def test_canonical_employment_type():
     assert canonical_employment_type("Paruh waktu") == "part_time"
     assert canonical_employment_type("Kontrak") == "contract"
     assert canonical_employment_type("Magang") == "internship"
+    # LinkedIn appends qualifiers; the qualifier must not leak into the enum.
+    assert canonical_employment_type("Magang jangka pendek") == "internship"
+    assert canonical_employment_type("Sukarelawan") == "volunteer"
+    assert canonical_employment_type("Kontrak sementara") == "contract"
     assert canonical_employment_type("Tidak berlaku") is None
     assert canonical_employment_type(None) is None

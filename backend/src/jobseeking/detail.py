@@ -65,9 +65,28 @@ EMPLOYMENT_TYPES: dict[str, str] = {
     "magang": "internship",
     "volunteer": "volunteer",
     "relawan": "volunteer",
+    "sukarelawan": "volunteer",
     "other": "other",
     "lainnya": "other",
 }
+
+# LinkedIn appends qualifiers ("Magang jangka pendek", "Kontrak sementara"), so
+# fall back to substring matching in priority order.
+EMPLOYMENT_SUBSTRINGS: tuple[tuple[str, str], ...] = (
+    ("magang", "internship"),
+    ("intern", "internship"),
+    ("sukarela", "volunteer"),
+    ("relawan", "volunteer"),
+    ("volunteer", "volunteer"),
+    ("kontrak", "contract"),
+    ("contract", "contract"),
+    ("paruh waktu", "part_time"),
+    ("part time", "part_time"),
+    ("penuh waktu", "full_time"),
+    ("full time", "full_time"),
+    ("sementara", "temporary"),
+    ("temporary", "temporary"),
+)
 
 
 def _clean_value(value: str | None) -> str | None:
@@ -88,6 +107,9 @@ def canonical_employment_type(value: str | None) -> str | None:
     key = cleaned.lower()
     if key in EMPLOYMENT_TYPES:
         return EMPLOYMENT_TYPES[key]
+    for needle, mapped in EMPLOYMENT_SUBSTRINGS:
+        if needle in key:
+            return mapped
     # Unknown wording: keep it machine-friendly instead of dropping information.
     return re.sub(r"[^a-z0-9]+", "_", key).strip("_")[:40] or None
 
