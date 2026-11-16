@@ -35,6 +35,10 @@ export default async function Page() {
   ]);
 
   const cityData = overview.by_city.slice(0, 10);
+  const keywordTop = overview.by_keyword
+    .slice(0, 2)
+    .map((k) => k.name)
+    .join(", ");
   const workData = overview.by_work_type.map((w) => ({
     name: WORK_TYPE_LABEL[w.name] ?? w.name,
     count: w.count,
@@ -65,7 +69,11 @@ export default async function Page() {
         />
         <KpiCard label="Jawa Timur" value={formatNumber(overview.jatim_jobs)} />
         <KpiCard label="Remote" value={formatNumber(overview.remote_jobs)} />
-        <KpiCard label="Pencarian" value="5 posisi" hint="web/software/frontend/backend/fullstack" />
+        <KpiCard
+          label="Kata kunci"
+          value={formatNumber(overview.by_keyword.length)}
+          hint={keywordTop ? `Teratas: ${keywordTop}` : "Belum ada data"}
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
