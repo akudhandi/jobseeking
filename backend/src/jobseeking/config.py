@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     scrape_max_retries: int = 3
     scrape_timeout_ms: int = 45000
     headless: bool = True
+    # How often the cron is *supposed* to complete a real scrape. The health
+    # endpoint flags the data as stale after 1.5x this, so the value must match
+    # MIN_INTERVAL in deploy/cron/scrape.sh.
+    scrape_interval_hours: float = 20.0
 
     api_host: str = "127.0.0.1"
     api_port: int = 8000

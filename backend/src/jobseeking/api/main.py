@@ -13,8 +13,9 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..config import get_settings
-from ..models import Company, Job, JobSkill, Skill
+from ..models import Company, CrawlRun, Job, JobSkill, Skill
 from .deps import get_db, job_to_dict
+from .health import job_coverage, run_to_dict, scrape_health
 
 settings = get_settings()
 
@@ -101,6 +102,30 @@ def _filtered_jobs(*conditions):
 def health(db: Session = Depends(get_db)) -> dict:
     total = db.scalar(select(func.count()).select_from(Job)) or 0
     return {"status": "ok", "jobs": total}
+
+
+@app.get("/health/scrape")
+def health_scrape(db: Session = Depends(get_db)) -> dict:
+    """Is the scraper alive, and how complete is the data it produced?"""
+    return scrape_health(db)
+
+
+@app.get("/runs")
+def list_runs(
+    db: Session = Depends(get_db),
+    limit: int = Query(30, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> dict:
+    total = db.scalar(select(func.count()).select_from(CrawlRun)) or 0
+    runs = db.scalars(
+        select(CrawlRun).order_by(CrawlRun.id.desc()).offset(offset).limit(limit)
+    ).all()
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "items": [run_to_dict(run) for run in runs],
+    }
 
 
 @app.get("/meta")
@@ -209,6 +234,7 @@ def stats_overview(db: Session = Depends(get_db)) -> dict:
     jatim = db.scalar(select(func.count()).select_from(Job).where(Job.is_jatim.is_(True))) or 0
     remote = db.scalar(select(func.count()).select_from(Job).where(Job.work_type == "remote")) or 0
     last_scraped = db.scalar(select(func.max(Job.scraped_at)))
+    coverage = job_coverage(db)
 
     def group(column, limit=20):
         rows = db.execute(
@@ -225,6 +251,9 @@ def stats_overview(db: Session = Depends(get_db)) -> dict:
         "total_companies": companies,
         "jobs_with_salary": with_salary,
         "salary_coverage": round(with_salary / total * 100, 1) if total else 0.0,
+        "city_coverage": coverage["city"]["percent"],
+        "employment_type_coverage": coverage["employment_type"]["percent"],
+        "description_coverage": coverage["description"]["percent"],
         "jatim_jobs": jatim,
         "remote_jobs": remote,
         "last_scraped_at": last_scraped.isoformat() if last_scraped else None,

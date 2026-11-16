@@ -70,8 +70,13 @@ Configuration notes:
 
 ```bash
 cd backend
-pytest -q
+pytest -q          # offline: SQLite in-memory + HTML fixtures
+ruff check .       # lint
+ruff format --check .
 ```
+
+CI (`.github/workflows/ci.yml`) menjalankan lint + format + pytest untuk backend
+dan typecheck + `next build` untuk web pada setiap push ke `main` dan setiap PR.
 
 ## Batch scraping
 
@@ -111,8 +116,9 @@ python -m jobseeking.pipeline --replay-raw
 jobseeking-api                 # or: python -m jobseeking.api.main
 ```
 
-Endpoints: `/jobs`, `/stats/overview`, `/stats/skills`, `/stats/companies`,
-`/stats/salary`, `/stats/trend`, `/export.csv`.
+Endpoints: `/jobs`, `/jobs/{job_id}`, `/meta`, `/stats/overview`, `/stats/skills`,
+`/stats/companies`, `/stats/salary`, `/stats/trend`, `/stats/locations`,
+`/runs`, `/health`, `/health/scrape`, `/export.csv`.
 
 ## Dashboard
 
@@ -242,6 +248,31 @@ crontab deploy/cron/crontab.example
 terakhir > 20 jam (`MIN_INTERVAL`). Jadi kalau box sedang suspend saat jadwal,
 tick berikutnya menyusul. `MIN_INTERVAL=0 ./scrape.sh` untuk memaksa.
 `EXTRA_ARGS` diteruskan ke pipeline (mis. `EXTRA_ARGS=--no-proxy`).
+
+`rotate.sh` (harian) memangkas `data/*.log` kalau sudah lewat 5 MB, karena cron
+menulis append terus-menerus dan tidak ada logrotate di box.
+
+### Kesehatan scrape
+`GET /api/health/scrape` merangkum kondisi pipeline dari tabel `crawl_runs`:
+status (`ok`/`stale`/`failing`/`empty`/`hung`/`never`), run terakhir, jumlah
+gagal beruntun, jadwal berikutnya, dan kelengkapan data per field. Dashboard
+menampilkan banner merah/kuning di halaman ringkasan kalau statusnya bukan
+`ok`, dan halaman **Riwayat scrape** (`/runs`) memuat semua run beserta
+coverage tiap field.
+
+Arti statusnya:
+
+| status | arti |
+|---|---|
+| `ok` | run sukses terakhir masih di dalam 1.5x interval |
+| `stale` | sukses terakhir sudah lewat `SCRAPE_INTERVAL_HOURS * 1.5` |
+| `failing` | run terakhir gagal (exception / exit non-zero) |
+| `empty` | run "selesai" tapi 0 lowongan — LinkedIn biasanya diam-diam memblokir |
+| `hung` | run masih `running` > 2 jam (container mati di tengah proses) |
+| `never` | belum ada run sukses sama sekali |
+
+`SCRAPE_INTERVAL_HOURS` (default 20) harus sama dengan `MIN_INTERVAL` di
+`deploy/cron/scrape.sh`, karena itulah yang dipakai menghitung batas basi.
 
 ### Update
 ```bash

@@ -9,3 +9,5 @@
 */30 * * * *  /data/jobseeking/deploy/cron/scrape.sh  >> /data/jobseeking/data/scrape.log 2>&1
 30 2 * * *    /data/jobseeking/deploy/cron/backup.sh  >> /data/jobseeking/data/backup.log 2>&1
 45 3 * * 0    /data/jobseeking/deploy/cron/prune.sh   >> /data/jobseeking/data/prune.log  2>&1
+# Log hygiene: cron writes append forever, so trim the logs daily.
+15 3 * * *    /data/jobseeking/deploy/cron/rotate.sh >> /data/jobseeking/data/rotate.log 2>&1

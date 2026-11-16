@@ -42,6 +42,9 @@ export interface Overview {
   total_companies: number;
   jobs_with_salary: number;
   salary_coverage: number;
+  city_coverage: number;
+  employment_type_coverage: number;
+  description_coverage: number;
   jatim_jobs: number;
   remote_jobs: number;
   last_scraped_at: string | null;
@@ -50,6 +53,52 @@ export interface Overview {
   by_seniority: NameCount[];
   by_keyword: NameCount[];
   by_employment_type: NameCount[];
+}
+
+export interface CoverageEntry {
+  count: number;
+  percent: number;
+}
+
+export interface CrawlRunItem {
+  id: number;
+  status: string;
+  started_at: string | null;
+  finished_at: string | null;
+  duration_seconds: number | null;
+  keywords: string | null;
+  locations: string | null;
+  pages_fetched: number;
+  jobs_found: number;
+  jobs_new: number;
+  jobs_updated: number;
+  jobs_failed: number;
+}
+
+export type ScrapeStatus = "ok" | "stale" | "failing" | "hung" | "empty" | "never";
+
+export interface ScrapeHealth {
+  status: ScrapeStatus;
+  message: string;
+  interval_hours: number;
+  stale_after_hours: number;
+  last_success_at: string | null;
+  age_hours: number | null;
+  next_due_at: string | null;
+  consecutive_failures: number;
+  last_run: CrawlRunItem | null;
+  runs: CrawlRunItem[];
+  coverage: {
+    total_jobs: number;
+    salary: CoverageEntry;
+    city: CoverageEntry;
+    province: CoverageEntry;
+    employment_type: CoverageEntry;
+    seniority: CoverageEntry;
+    description: CoverageEntry;
+    experience: CoverageEntry;
+    keyword: CoverageEntry;
+  };
 }
 
 export interface SkillStat {

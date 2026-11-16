@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Building2, LayoutDashboard, ListChecks, Wallet } from "lucide-react";
+import { BarChart3, Building2, History, LayoutDashboard, ListChecks, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -11,6 +11,7 @@ const NAV = [
   { href: "/salary", label: "Gaji", icon: Wallet },
   { href: "/companies", label: "Perusahaan", icon: Building2 },
   { href: "/jobs", label: "Lowongan", icon: ListChecks },
+  { href: "/runs", label: "Riwayat scrape", icon: History },
 ];
 
 export function Sidebar() {

@@ -1,10 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Donut, HorizontalBars, TrendLine, VerticalBars } from "@/components/charts";
+import { HealthBanner } from "@/components/health-banner";
 import { KpiCard } from "@/components/kpi";
 import { safeGet } from "@/lib/api";
 import { formatNumber } from "@/lib/format";
 import { WORK_TYPE_LABEL } from "@/lib/format";
-import type { Overview, TrendItem } from "@/lib/types";
+import type { Overview, ScrapeHealth, TrendItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,9 @@ const EMPTY: Overview = {
   total_companies: 0,
   jobs_with_salary: 0,
   salary_coverage: 0,
+  city_coverage: 0,
+  employment_type_coverage: 0,
+  description_coverage: 0,
   jatim_jobs: 0,
   remote_jobs: 0,
   last_scraped_at: null,
@@ -24,9 +28,10 @@ const EMPTY: Overview = {
 };
 
 export default async function Page() {
-  const [overview, trend] = await Promise.all([
+  const [overview, trend, health] = await Promise.all([
     safeGet<Overview>("/stats/overview", EMPTY),
     safeGet<{ items: TrendItem[] }>("/stats/trend", { items: [] }),
+    safeGet<ScrapeHealth | null>("/health/scrape", null),
   ]);
 
   const cityData = overview.by_city.slice(0, 10);
@@ -43,6 +48,8 @@ export default async function Page() {
           Ringkasan pasar lowongan developer di Jawa Timur berdasarkan data hasil scraping.
         </p>
       </header>
+
+      <HealthBanner health={health} />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard label="Total lowongan" value={formatNumber(overview.total_jobs)} />
@@ -68,6 +75,10 @@ export default async function Page() {
             ) : (
               <Empty />
             )}
+            <p className="mt-3 text-xs text-muted-foreground">
+              {overview.city_coverage}% lowongan menyebutkan kota; sisanya remote atau hanya
+              mencantumkan negara.
+            </p>
           </CardContent>
         </Card>
 
