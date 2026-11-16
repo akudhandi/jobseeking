@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -65,6 +66,11 @@ def init_db() -> None:
 
 def _run_migrations() -> None:
     """Apply every pending revision (``alembic upgrade head``)."""
+    # Alembic registers its autogenerate plugins the moment it is imported, and
+    # each registration logs a line at INFO. It has to be silenced before the
+    # import, otherwise the api and scraper print six lines on every start.
+    logging.getLogger("alembic.runtime.plugins").setLevel(logging.WARNING)
+
     from alembic import command
     from alembic.config import Config
 
