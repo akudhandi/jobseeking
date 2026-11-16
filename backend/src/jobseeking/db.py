@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -68,12 +67,6 @@ def _run_migrations() -> None:
     """Apply every pending revision (``alembic upgrade head``)."""
     from alembic import command
     from alembic.config import Config
-
-    # Alembic logs seven INFO lines while resolving autogenerate plugins, and it
-    # does so before env.py can load alembic.ini's logging config — so they would
-    # show up in the api/scraper log on every start. Migration progress
-    # (alembic.runtime.migration) stays visible.
-    logging.getLogger("alembic.runtime.plugins").setLevel(logging.WARNING)
 
     cfg = Config(str(BACKEND_DIR / "alembic.ini"))
     # Set explicitly so the migrations are found even when the process cwd is not
