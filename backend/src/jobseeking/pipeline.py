@@ -147,9 +147,24 @@ async def scrape(args: argparse.Namespace) -> dict[str, int]:
     return stats
 
 
+def _raw_keyword(stem: str, canonical: dict[str, str]) -> str:
+    """Recover the search term from a raw search file name.
+
+    ``rawstore`` slugifies the name, so "remote developer" is saved as
+    ``remote_developer__Jawa_Timur_Indonesia__0.html``. Map that back to the
+    exact spelling used by the live search (from the crawl config), otherwise
+    replay would add a second, slug-shaped keyword next to the real one.
+    """
+    if "__" not in stem:
+        return ""
+    slug = stem.split("__", 1)[0]
+    return canonical.get(slug, slug.replace("_", " "))
+
+
 def replay(args: argparse.Namespace) -> dict[str, int]:
     settings = get_settings()  # noqa: F841  (ensures settings load)
     config = load_crawl_config()
+    canonical = {rawstore.slug(k): k for k in config.keywords}
     init_db()
 
     cards: list[JobCard] = []
@@ -159,7 +174,7 @@ def replay(args: argparse.Namespace) -> dict[str, int]:
         # rawstore saves search pages as "<keyword>__<location>__<start>.html",
         # so the file name is the only surviving proof of which search returned
         # this card — and the same card is usually returned by several.
-        keyword = path.stem.split("__", 1)[0] if "__" in path.stem else ""
+        keyword = _raw_keyword(path.stem, canonical)
         for card in parse_job_cards(rawstore.read_raw(path)):
             if keyword:
                 keywords_by_job.setdefault(card.job_id, set()).add(keyword)
