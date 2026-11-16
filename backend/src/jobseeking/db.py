@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from .config import get_settings
+from .config import BACKEND_DIR, get_settings
 
 
 class Base(DeclarativeBase):
@@ -48,27 +48,30 @@ def session_scope() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    """Create all tables (idempotent) and apply additive column changes."""
+    """Bring the schema up to date.
+
+    Postgres runs the versioned Alembic migrations, which is a no-op once the
+    database is at head. SQLite is only used by the tests, where the models are
+    the schema, so those tables are created directly.
+    """
     from . import models  # noqa: F401  (register mappers)
 
-    Base.metadata.create_all(bind=get_engine())
-    _apply_additive_columns()
-
-
-# Columns introduced after the first deploy. ``create_all`` never ALTERs an
-# existing table, and dropping the volume to migrate means losing every job, so
-# additive changes are applied here. Postgres supports IF NOT EXISTS; SQLite
-# test databases are created fresh from the models and skip this path.
-ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
-    ("jobs", "min_years_experience", "INTEGER"),
-    ("jobs", "updated_at", "TIMESTAMPTZ NOT NULL DEFAULT now()"),
-)
-
-
-def _apply_additive_columns() -> None:
     engine = get_engine()
     if engine.dialect.name != "postgresql":
+        Base.metadata.create_all(bind=engine)
         return
-    with engine.begin() as conn:
-        for table, column, ddl in ADDITIVE_COLUMNS:
-            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {ddl}"))
+    _run_migrations()
+
+
+def _run_migrations() -> None:
+    """Apply every pending revision (``alembic upgrade head``)."""
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config(str(BACKEND_DIR / "alembic.ini"))
+    # Set explicitly so the migrations are found even when the process cwd is not
+    # the backend directory (containers, cron, uvicorn).
+    cfg.set_main_option("script_location", str(BACKEND_DIR / "migrations"))
+    # ConfigParser interpolation: a literal % in the password must be doubled.
+    cfg.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
+    command.upgrade(cfg, "head")

@@ -187,7 +187,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="fetch directly from the host IP (use when the proxy pool is unusable)",
     )
     parser.add_argument("--replay-raw", action="store_true", help="re-parse saved HTML, no network")
-    parser.add_argument("--init-db", action="store_true", help="create tables and exit")
+    parser.add_argument("--init-db", action="store_true", help="apply migrations and exit")
     parser.add_argument("--log-level", default="INFO")
     return parser
 
@@ -200,7 +200,7 @@ def main() -> None:
     )
     if args.init_db:
         init_db()
-        log.info("database initialized")
+        log.info("database at head")
         return
     if args.replay_raw:
         replay(args)

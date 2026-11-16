@@ -14,8 +14,12 @@ COPY src ./src
 RUN pip install .
 
 COPY config.yaml ./
+# Alembic config + migrations live next to the package: the container applies
+# pending revisions on start (`python -m jobseeking.pipeline --init-db`).
+COPY alembic.ini ./
+COPY migrations ./migrations
 
 EXPOSE 8000
 
-# Create tables (idempotent) then serve the read API.
+# Apply pending migrations, then serve the read API.
 CMD ["sh", "-c", "python -m jobseeking.pipeline --init-db && uvicorn jobseeking.api.main:app --host 0.0.0.0 --port 8000"]

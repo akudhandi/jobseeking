@@ -280,6 +280,34 @@ cd /data/jobseeking
 git pull && docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 ```
 
+### Migrasi skema (Alembic)
+Skema Postgres dikelola lewat Alembic (`backend/alembic.ini` + `backend/migrations/`).
+`init_db()` — dipanggil `--init-db` di CMD container api dan di awal setiap
+pipeline scrape — menjalankan `alembic upgrade head`, jadi container yang naik
+selalu membawa skema terbaru. Database SQLite (hanya untuk tes) tetap dibuat
+langsung dari model.
+
+Menambah kolom/tabel:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "add job_keywords"   # URL dari DATABASE_URL
+# baca hasilnya, rapikan, lalu:
+alembic upgrade head
+```
+
+Yang perlu diingat:
+
+- `0001` adalah baseline: skema yang sudah ada di prod. Database lama **tidak
+  dibuat ulang**, cukup ditandai dengan `alembic stamp head` (sudah dilakukan
+  saat cutover; jangan pernah drop volume `pgdata`).
+- URL tidak disimpan di `alembic.ini` — `migrations/env.py` memakai `DATABASE_URL`
+  dari environment, jadi tidak ada kredensial di repo.
+- `env.py` memasang advisory lock Postgres, supaya api (`--init-db`) dan scraper
+  tidak menjalankan migrasi yang sama bersamaan saat deploy bertepatan dengan cron.
+- Tes `tests/test_migrations.py` memigrasikan SQLite dari nol lalu membandingkan
+  tabel, kolom, dan index dengan model — baseline yang melenceng langsung gagal di CI.
+
 ### Ukuran image
 | image | size | catatan |
 |---|---|---|

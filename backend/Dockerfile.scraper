@@ -21,6 +21,9 @@ RUN pip install . \
     && rm -rf /var/lib/apt/lists/*
 
 COPY config.yaml ./
+# Alembic config + migrations: the scraper applies pending revisions on start.
+COPY alembic.ini ./
+COPY migrations ./migrations
 
 # Raw HTML + exports live on a mounted volume so they survive rebuilds.
 VOLUME ["/app/data"]
