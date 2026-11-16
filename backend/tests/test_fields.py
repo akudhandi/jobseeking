@@ -152,6 +152,25 @@ def test_parse_requirements():
     assert req.min_years == 3
 
 
+def test_build_parsed_job_prefers_specific_location():
+    from jobseeking.build import build_parsed_job
+
+    config = load_crawl_config()
+    card = JobCard(
+        job_id="2",
+        title="Backend Developer",
+        company="PT ABC",
+        location="Surabaya, Jawa Timur, Indonesia",
+        url="https://www.linkedin.com/jobs/view/2",
+    )
+    # Guest detail pages frequently report only the country.
+    detail = JobDetail(job_id="2", title="Backend Developer", location="Indonesia")
+    rec = build_parsed_job(card, detail, "backend developer", config)
+    assert rec.location_raw == "Surabaya, Jawa Timur, Indonesia"
+    assert rec.city == "Surabaya"
+    assert rec.is_jatim is True
+
+
 def test_build_parsed_job():
     from jobseeking.build import build_parsed_job
 

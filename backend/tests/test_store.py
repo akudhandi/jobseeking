@@ -138,3 +138,24 @@ def test_replay_style_update_keeps_search_keyword():
     job, _ = upsert_job(session, replay_rec)
     session.commit()
     assert job.search_keyword == "backend developer"
+
+
+def test_less_specific_location_does_not_downgrade_city():
+    """Detail pages from the guest endpoint often only say "Indonesia"; that
+    must not erase the city the search card already gave us."""
+    session = _session()
+    upsert_job(session, _full_record())
+    session.commit()
+
+    vague = _full_record()
+    vague.location_raw = "Indonesia"
+    vague.city = None
+    vague.province = None
+    vague.is_jatim = False
+    job, _ = upsert_job(session, vague)
+    session.commit()
+
+    assert job.city == "Surabaya"
+    assert job.province == "Jawa Timur"
+    assert job.is_jatim is True
+    assert job.location_raw == "Indonesia"

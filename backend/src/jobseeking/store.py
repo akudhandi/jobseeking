@@ -74,12 +74,18 @@ def upsert_job(session: Session, rec: ParsedJob) -> tuple[Job, bool]:
         job.company = company
 
     # A card always has a location; a missing detail page does not. Only trust
-    # the location parse when the new record actually carries one.
+    # the location parse when the new record actually carries one, and never
+    # downgrade a known city to "unknown" because the detail page only said
+    # "Indonesia".
     if rec.location_raw:
         job.location_raw = rec.location_raw
-        job.city = rec.city
-        job.province = rec.province
-        job.is_jatim = rec.is_jatim
+        if rec.city is not None:
+            job.city = rec.city
+        if rec.province is not None:
+            job.province = rec.province
+            job.is_jatim = rec.is_jatim
+        elif rec.city is not None:
+            job.is_jatim = rec.is_jatim
 
     job.work_type = _merge_enum(rec.work_type, job.work_type) or "unknown"
     job.employment_type = _merge_text(rec.employment_type, job.employment_type)

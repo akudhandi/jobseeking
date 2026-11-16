@@ -6,6 +6,7 @@ from .config import CrawlConfig
 from .detail import JobDetail, canonical_employment_type
 from .normalize import parse_datetime
 from .parse import (
+    LocationInfo,
     detect_seniority,
     detect_work_type,
     extract_skills,
@@ -15,6 +16,24 @@ from .parse import (
 )
 from .records import ParsedJob
 from .search import JobCard
+
+
+def _pick_location(
+    card: JobCard, detail: JobDetail | None, cities: list[str] | None
+) -> tuple[str | None, LocationInfo]:
+    """Use the most specific location available.
+
+    Guest detail pages often only say "Indonesia", while the search card knows
+    the city. Prefer whichever candidate actually resolves to a city.
+    """
+    candidates = [raw for raw in ((detail.location if detail else None), card.location) if raw]
+    parsed = [(raw, parse_location(raw, cities)) for raw in candidates]
+    for raw, info in parsed:
+        if info.city:
+            return raw, info
+    if parsed:
+        return parsed[0]
+    return None, LocationInfo(None, None, False)
 
 
 def build_parsed_job(
@@ -27,9 +46,8 @@ def build_parsed_job(
     description = detail.description_text if detail else ""
     title = (detail.title if detail and detail.title else card.title) or ""
     company = (detail.company if detail and detail.company else card.company) or None
-    location = (detail.location if detail and detail.location else card.location) or None
 
-    loc = parse_location(location, config.jatim_cities)
+    location, loc = _pick_location(card, detail, config.jatim_cities)
     salary = parse_salary(description)
     req = parse_requirements(description)
     seniority = detect_seniority(
