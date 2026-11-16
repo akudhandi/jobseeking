@@ -39,7 +39,7 @@ def _pick_location(
 def build_parsed_job(
     card: JobCard,
     detail: JobDetail | None,
-    keyword: str | None,
+    keywords: list[str] | None,
     config: CrawlConfig,
     run_id: int | None = None,
 ) -> ParsedJob:
@@ -82,6 +82,6 @@ def build_parsed_job(
         requirements=req.items,
         min_years_experience=req.min_years,
         skills=skills,
-        search_keyword=keyword,
+        search_keywords=[k for k in (keywords or []) if k],
         run_id=run_id,
     )

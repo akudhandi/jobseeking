@@ -148,7 +148,7 @@ def test_coverage_counts_nulls_as_missing():
             province="Jawa Timur",
             employment_type="full_time",
             description_raw="deskripsi",
-            search_keyword="backend developer",
+            search_keywords=["backend developer"],
         ),
     )
     upsert_job(

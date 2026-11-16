@@ -13,7 +13,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..config import get_settings
-from ..models import Company, CrawlRun, Job, JobSkill, Skill
+from ..models import Company, CrawlRun, Job, JobKeyword, JobSkill, Skill
 from .deps import get_db, job_to_dict
 from .health import job_coverage, run_to_dict, scrape_health
 
@@ -74,7 +74,9 @@ def _build_filters(
     if employment_type:
         conditions.append(Job.employment_type == employment_type)
     if keyword:
-        conditions.append(Job.search_keyword == keyword)
+        conditions.append(
+            Job.id.in_(select(JobKeyword.job_id).where(JobKeyword.keyword == keyword))
+        )
     if company:
         conditions.append(Company.slug == company)
     if skills:
@@ -96,7 +98,9 @@ def _build_filters(
 
 
 def _filtered_jobs(*conditions):
-    stmt = select(Job).options(selectinload(Job.skills), selectinload(Job.company))
+    stmt = select(Job).options(
+        selectinload(Job.skills), selectinload(Job.company), selectinload(Job.keywords)
+    )
     if conditions:
         stmt = stmt.join(Company, Job.company_id == Company.id, isouter=True).where(*conditions)
     return stmt
@@ -146,13 +150,20 @@ def meta(db: Session = Depends(get_db)) -> dict:
     skill_rows = db.execute(
         select(Skill.slug, Skill.name, Skill.category).order_by(Skill.category, Skill.name)
     ).all()
+    keyword_rows = db.execute(
+        select(JobKeyword.keyword)
+        .join(Job, Job.id == JobKeyword.job_id)
+        .where(active)
+        .distinct()
+        .order_by(JobKeyword.keyword)
+    ).all()
     return {
         "cities": distinct(Job.city),
         "provinces": distinct(Job.province),
         "work_types": distinct(Job.work_type),
         "seniorities": distinct(Job.seniority),
         "employment_types": distinct(Job.employment_type),
-        "keywords": distinct(Job.search_keyword),
+        "keywords": [k for (k,) in keyword_rows if k],
         "skills": [{"slug": s, "name": n, "category": c} for s, n, c in skill_rows],
     }
 
@@ -223,12 +234,30 @@ def list_jobs(
 def get_job(job_id: str, db: Session = Depends(get_db)) -> dict:
     job = db.scalar(
         select(Job)
-        .options(selectinload(Job.skills), selectinload(Job.company))
+        .options(selectinload(Job.skills), selectinload(Job.company), selectinload(Job.keywords))
         .where(Job.job_id == job_id)
     )
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")
     return job_to_dict(job, include_description=True)
+
+
+def _keyword_counts(db: Session, limit: int = 20) -> list[dict]:
+    """Postings per search term.
+
+    One posting is usually returned by several searches, so the counts sum to
+    more than the number of jobs — that is the point of job_keywords.
+    """
+    counts = func.count(func.distinct(JobKeyword.job_id))
+    rows = db.execute(
+        select(JobKeyword.keyword, counts.label("count"))
+        .join(Job, Job.id == JobKeyword.job_id)
+        .where(Job.is_active.is_(True))
+        .group_by(JobKeyword.keyword)
+        .order_by(counts.desc())
+        .limit(limit)
+    ).all()
+    return [{"name": name, "count": count} for name, count in rows]
 
 
 @app.get("/stats/overview")
@@ -287,7 +316,7 @@ def stats_overview(db: Session = Depends(get_db)) -> dict:
         "by_city": group(Job.city),
         "by_work_type": group(Job.work_type),
         "by_seniority": group(Job.seniority),
-        "by_keyword": group(Job.search_keyword),
+        "by_keyword": _keyword_counts(db),
         "by_employment_type": group(Job.employment_type),
     }
 
@@ -313,7 +342,9 @@ def stats_skills(
     if city:
         stmt = stmt.where(Job.city.ilike(city))
     if keyword:
-        stmt = stmt.where(Job.search_keyword == keyword)
+        stmt = stmt.where(
+            Job.id.in_(select(JobKeyword.job_id).where(JobKeyword.keyword == keyword))
+        )
     stmt = stmt.where(Job.is_active.is_(True))
     rows = db.execute(stmt).all()
     return {"items": [{"slug": s, "name": n, "category": c, "count": cnt} for s, n, c, cnt in rows]}
@@ -384,6 +415,37 @@ def _salary_dimension(db: Session, column, min_count: int = 1) -> list[dict]:
     ]
 
 
+def _salary_by_keyword(db: Session) -> list[dict]:
+    """Salary per search term; a posting counts once per keyword that found it."""
+    mid = (Job.salary_min + func.coalesce(Job.salary_max, Job.salary_min)) / 2
+    stmt = (
+        select(
+            JobKeyword.keyword.label("name"),
+            func.count(Job.id).label("count"),
+            func.avg(Job.salary_min).label("avg_min"),
+            func.avg(Job.salary_max).label("avg_max"),
+            func.avg(mid).label("avg_mid"),
+        )
+        .join(Job, Job.id == JobKeyword.job_id)
+        .where(or_(Job.salary_min.is_not(None), Job.salary_max.is_not(None)))
+        .where(Job.is_active.is_(True))
+        .group_by(JobKeyword.keyword)
+        .order_by(func.avg(mid).desc())
+        .limit(30)
+    )
+    rows = db.execute(stmt).all()
+    return [
+        {
+            "name": name,
+            "count": count,
+            "avg_min": round(avg_min) if avg_min else None,
+            "avg_max": round(avg_max) if avg_max else None,
+            "avg_mid": round(avg_mid) if avg_mid else None,
+        }
+        for name, count, avg_min, avg_max, avg_mid in rows
+    ]
+
+
 @app.get("/stats/salary")
 def stats_salary(db: Session = Depends(get_db)) -> dict:
     rows = db.execute(
@@ -428,7 +490,7 @@ def stats_salary(db: Session = Depends(get_db)) -> dict:
         ],
         "by_seniority": _salary_dimension(db, Job.seniority),
         "by_city": _salary_dimension(db, Job.city),
-        "by_keyword": _salary_dimension(db, Job.search_keyword),
+        "by_keyword": _salary_by_keyword(db),
     }
 
 
@@ -500,6 +562,7 @@ def export_csv(
             "salary_period",
             "posted_at",
             "skills",
+            "keywords",
             "url",
         ]
     )
@@ -520,6 +583,7 @@ def export_csv(
                 job.salary_period or "",
                 job.posted_at.isoformat() if job.posted_at else "",
                 "|".join(s.slug for s in job.skills),
+                "|".join(sorted(link.keyword for link in job.keywords)),
                 job.url,
             ]
         )

@@ -46,7 +46,7 @@ def job_to_dict(job: Job, *, include_description: bool = False) -> dict:
         "scraped_at": _iso(job.scraped_at),
         "updated_at": _iso(job.updated_at),
         "min_years_experience": job.min_years_experience,
-        "search_keyword": job.search_keyword,
+        "keywords": sorted(link.keyword for link in job.keywords),
         "source": job.source,
         "is_active": job.is_active,
         "missed_runs": job.missed_runs,

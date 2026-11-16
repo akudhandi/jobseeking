@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import Engine, create_engine, inspect
+from sqlalchemy import Engine, create_engine, inspect, text
 
 from jobseeking import models  # noqa: F401  (registers the mappers)
 from jobseeking.config import BACKEND_DIR
@@ -64,3 +64,50 @@ def test_migration_matches_indexes(migrated: Engine, table_name: str):
     table = Base.metadata.tables[table_name]
     expected = {(index.columns.keys()[0], bool(index.unique)) for index in table.indexes}
     assert _index_signature(migrated, table_name) == expected
+
+
+def test_keyword_column_is_backfilled_into_job_keywords(tmp_path):
+    """0003 moves ``jobs.search_keyword`` into the new table.
+
+    The backfill is the risky part of the migration — the drop is irreversible —
+    so exercise it with real rows instead of only comparing DDL.
+    """
+    url = f"sqlite+pysqlite:///{(tmp_path / 'backfill.db').as_posix()}"
+    cfg = _alembic_config(url)
+    command.upgrade(cfg, "0002")
+
+    engine = create_engine(url)
+    insert = (
+        "INSERT INTO jobs (job_id, title, url, is_jatim, work_type, salary_currency,"
+        " source, search_keyword) VALUES (:job_id, :title, :url, 0, 'remote', 'IDR',"
+        " 'linkedin', :keyword)"
+    )
+    with engine.begin() as conn:
+        conn.execute(
+            text(insert),
+            {
+                "job_id": "1",
+                "title": "Backend Developer",
+                "url": "u1",
+                "keyword": "backend developer",
+            },
+        )
+        # A posting with no keyword must not produce an empty row.
+        conn.execute(
+            text(insert),
+            {"job_id": "2", "title": "No Keyword", "url": "u2", "keyword": None},
+        )
+
+    command.upgrade(cfg, "head")
+
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT j.job_id, k.keyword FROM jobs j"
+                " JOIN job_keywords k ON k.job_id = j.id ORDER BY j.job_id"
+            )
+        ).all()
+        assert rows == [("1", "backend developer")]
+        assert "search_keyword" not in {c["name"] for c in inspect(engine).get_columns("jobs")}
+
+    engine.dispose()

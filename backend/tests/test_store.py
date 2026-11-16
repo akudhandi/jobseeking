@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from jobseeking.db import Base
-from jobseeking.models import Company, Job, Skill
+from jobseeking.models import Company, Job, JobKeyword, Skill
 from jobseeking.records import ParsedJob
 from jobseeking.store import age_missing_jobs, upsert_job
 
@@ -87,7 +87,7 @@ def _full_record() -> ParsedJob:
         requirements=["Minimal 3 tahun pengalaman"],
         min_years_experience=3,
         skills=["node-js", "postgresql"],
-        search_keyword="backend developer",
+        search_keywords=["backend developer"],
     )
 
 
@@ -123,21 +123,49 @@ def test_rescrape_without_detail_does_not_erase_data():
     assert job.work_type == "remote"
     assert job.min_years_experience == 3
     assert job.requirements == ["Minimal 3 tahun pengalaman"]
-    assert job.search_keyword == "backend developer"
+    assert [k.keyword for k in job.keywords] == ["backend developer"]
     assert [s.slug for s in job.skills] == ["node-js", "postgresql"]
 
 
-def test_replay_style_update_keeps_search_keyword():
-    # --replay-raw passes keyword=None; that must not wipe the stored keyword.
+def test_replay_without_keywords_keeps_stored_ones():
+    # --replay-raw passes no keyword when the raw file name is unreadable; that
+    # must not wipe the attribution a real search already made.
     session = _session()
     upsert_job(session, _full_record())
     session.commit()
 
     replay_rec = _full_record()
-    replay_rec.search_keyword = None
+    replay_rec.search_keywords = []
     job, _ = upsert_job(session, replay_rec)
     session.commit()
-    assert job.search_keyword == "backend developer"
+    assert [k.keyword for k in job.keywords] == ["backend developer"]
+
+
+def test_one_job_accumulates_every_keyword_that_found_it():
+    """The old single column kept only the last keyword written, which is why
+    "web developer" showed zero jobs while being in the config."""
+    session = _session()
+    rec = _full_record()
+    rec.search_keywords = ["backend developer", "remote developer"]
+    job, _ = upsert_job(session, rec)
+    session.commit()
+    assert sorted(k.keyword for k in job.keywords) == ["backend developer", "remote developer"]
+
+    # Re-running the same searches must not duplicate rows.
+    upsert_job(session, rec)
+    session.commit()
+    assert sorted(k.keyword for k in job.keywords) == ["backend developer", "remote developer"]
+    assert len(session.scalars(select(JobKeyword)).all()) == 2
+
+    # A third search later finds the same posting and is added, not substituted.
+    rec.search_keywords = ["web developer"]
+    job, _ = upsert_job(session, rec)
+    session.commit()
+    assert sorted(k.keyword for k in job.keywords) == [
+        "backend developer",
+        "remote developer",
+        "web developer",
+    ]
 
 
 def test_less_specific_location_does_not_downgrade_city():

@@ -33,6 +33,6 @@ class ParsedJob:
 
     skills: list[str] = field(default_factory=list)
 
-    search_keyword: str | None = None
+    search_keywords: list[str] = field(default_factory=list)
     source: str = "linkedin"
     run_id: int | None = None

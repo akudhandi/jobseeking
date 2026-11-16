@@ -96,6 +96,13 @@ python -m jobseeking.pipeline --replay-raw
 - **Upsert merges, never replaces.** A run whose detail fetch is blocked still
   yields the search card; that card must not blank description, salary, skills,
   keyword, or a known city. `--replay-raw` is therefore safe for backfills.
+- **Keyword membership is many-to-many.** A posting is routinely returned by
+  several searches, so `job_keywords(job_id, keyword)` records every one that
+  found it instead of the single value the old `jobs.search_keyword` column kept
+  — that column silently held only the most recent search, which is why a keyword
+  in `config.yaml` could show zero jobs. Per-keyword counts therefore sum to more
+  than the number of postings. `--replay-raw` recovers membership from the raw
+  file names (`<keyword>__<location>__<start>.html`) for the pages still on disk.
 - **Location** prefers the most specific candidate: a guest detail page often
   says only `Indonesia` while the search card knows the city. City/province are
   never downgraded to unknown. `kecamatan`-level values are mapped to their

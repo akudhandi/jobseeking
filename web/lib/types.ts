@@ -19,6 +19,7 @@ export interface JobItem {
   posted_at: string | null;
   scraped_at: string | null;
   search_keyword: string | null;
+  keywords: string[];
   source: string;
   is_active: boolean;
   missed_runs: number;

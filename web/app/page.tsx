@@ -146,6 +146,10 @@ export default async function Page() {
             ) : (
               <Empty />
             )}
+            <p className="mt-3 text-xs text-muted-foreground">
+              Satu lowongan bisa ditemukan oleh beberapa kata kunci, jadi total per kata kunci
+              melebihi jumlah lowongan.
+            </p>
           </CardContent>
         </Card>
 

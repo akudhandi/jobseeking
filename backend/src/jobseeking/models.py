@@ -133,10 +133,28 @@ class Job(Base):
     )
     missed_runs: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
 
-    search_keyword: Mapped[str | None] = mapped_column(String(255), nullable=True)
     source: Mapped[str] = mapped_column(String(40), default="linkedin")
     run_id: Mapped[int | None] = mapped_column(
         ForeignKey("crawl_runs.id", ondelete="SET NULL"), nullable=True
     )
 
     skills: Mapped[list[Skill]] = relationship(secondary="job_skills", back_populates="jobs")
+    keywords: Mapped[list[JobKeyword]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
+
+
+class JobKeyword(Base):
+    """A search term that returned this posting.
+
+    One posting is routinely found by several searches. A single column cannot
+    represent that — each run overwrote the keyword stored by the previous one,
+    which is why "web developer" showed zero jobs despite being in config.yaml.
+    """
+
+    __tablename__ = "job_keywords"
+
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), primary_key=True)
+    keyword: Mapped[str] = mapped_column(String(255), primary_key=True, index=True)
+
+    job: Mapped[Job] = relationship(back_populates="keywords")

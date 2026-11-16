@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from .models import Company, Job, Skill
+from .models import Company, Job, JobKeyword, Skill
 from .normalize import company_name_norm, slugify
 from .parse import SKILL_BY_SLUG
 from .records import ParsedJob
@@ -126,9 +126,13 @@ def upsert_job(session: Session, rec: ParsedJob) -> tuple[Job, bool]:
     if rec.min_years_experience is not None:
         job.min_years_experience = rec.min_years_experience
 
-    # Replay passes keyword=None; never let it erase what the search knew.
-    if rec.search_keyword:
-        job.search_keyword = rec.search_keyword
+    # A posting is usually returned by several searches, so keep every one of
+    # them. Replay passes none when a raw file name cannot be read; that must not
+    # erase what earlier runs attributed.
+    known = {link.keyword for link in job.keywords}
+    for keyword in sorted(set(rec.search_keywords) - known):
+        if keyword:
+            job.keywords.append(JobKeyword(keyword=keyword))
     job.source = rec.source or job.source
     if rec.run_id is not None:
         job.run_id = rec.run_id

@@ -18,7 +18,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
-from ..models import CrawlRun, Job
+from ..models import CrawlRun, Job, JobKeyword
 
 # A run still marked "running" this long after it started was killed mid-flight
 # — the sandbox suspended, the container was recreated, or the host OOM'd — and
@@ -93,7 +93,14 @@ def job_coverage(db: Session) -> dict[str, Any]:
         "seniority": db.scalar(select(func.count(Job.seniority)).where(active)) or 0,
         "description": db.scalar(select(func.count(Job.description_raw)).where(active)) or 0,
         "experience": db.scalar(select(func.count(Job.min_years_experience)).where(active)) or 0,
-        "keyword": db.scalar(select(func.count(Job.search_keyword)).where(active)) or 0,
+        # Postings, not keyword rows: a posting found by three keywords is still
+        # one posting with a keyword.
+        "keyword": db.scalar(
+            select(func.count(func.distinct(JobKeyword.job_id)))
+            .join(Job, Job.id == JobKeyword.job_id)
+            .where(active)
+        )
+        or 0,
     }
     out: dict[str, Any] = {
         "total_jobs": total,

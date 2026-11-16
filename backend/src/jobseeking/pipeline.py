@@ -125,7 +125,7 @@ async def scrape(args: argparse.Namespace) -> dict[str, int]:
                                 details[card.job_id] = parsed
 
                     records = [
-                        build_parsed_job(card, details.get(card.job_id), keyword, config, run_id)
+                        build_parsed_job(card, details.get(card.job_id), [keyword], config, run_id)
                         for card in cards
                     ]
                     _store_records(records, stats)
@@ -152,10 +152,17 @@ def replay(args: argparse.Namespace) -> dict[str, int]:
     config = load_crawl_config()
     init_db()
 
-    cards = []
+    cards: list[JobCard] = []
+    keywords_by_job: dict[str, set[str]] = {}
     seen: set[str] = set()
     for path in rawstore.list_raw("search"):
+        # rawstore saves search pages as "<keyword>__<location>__<start>.html",
+        # so the file name is the only surviving proof of which search returned
+        # this card — and the same card is usually returned by several.
+        keyword = path.stem.split("__", 1)[0] if "__" in path.stem else ""
         for card in parse_job_cards(rawstore.read_raw(path)):
+            if keyword:
+                keywords_by_job.setdefault(card.job_id, set()).add(keyword)
             if card.job_id not in seen:
                 seen.add(card.job_id)
                 cards.append(card)
@@ -186,7 +193,14 @@ def replay(args: argparse.Namespace) -> dict[str, int]:
     run_id = _open_run(["(replay)"], ["(raw)"])
     stats = {"found": len(cards), "new": 0, "updated": 0, "failed": 0, "pages": 0}
     records = [
-        build_parsed_job(card, details.get(card.job_id), None, config, run_id) for card in cards
+        build_parsed_job(
+            card,
+            details.get(card.job_id),
+            sorted(keywords_by_job.get(card.job_id, set())),
+            config,
+            run_id,
+        )
+        for card in cards
     ]
     _store_records(records, stats)
     _close_run(run_id, stats)
