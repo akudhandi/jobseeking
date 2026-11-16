@@ -4,7 +4,7 @@ import { HealthBanner } from "@/components/health-banner";
 import { KpiCard } from "@/components/kpi";
 import { safeGet } from "@/lib/api";
 import { formatNumber } from "@/lib/format";
-import { WORK_TYPE_LABEL } from "@/lib/format";
+import { labelEmploymentType, WORK_TYPE_LABEL } from "@/lib/format";
 import type { Overview, ScrapeHealth, TrendItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +38,10 @@ export default async function Page() {
   const workData = overview.by_work_type.map((w) => ({
     name: WORK_TYPE_LABEL[w.name] ?? w.name,
     count: w.count,
+  }));
+  const employmentData = overview.by_employment_type.map((e) => ({
+    name: labelEmploymentType(e.name),
+    count: e.count,
   }));
 
   return (
@@ -101,6 +105,15 @@ export default async function Page() {
             ) : (
               <Empty />
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Jenis pekerjaan</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {employmentData.length ? <Donut data={employmentData} /> : <Empty />}
           </CardContent>
         </Card>
 
