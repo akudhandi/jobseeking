@@ -91,7 +91,7 @@ export function NavPills({ className }: { className?: string }) {
 export function MobileNav({ className }: { className?: string }) {
   const pathname = usePathname();
   return (
-    <nav className={cn("scrollbar-none flex gap-1.5 overflow-x-auto pb-1", className)}>
+    <nav className={cn("scrollbar-none fade-r flex gap-1.5 overflow-x-auto pb-1", className)}>
       {NAV.map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (

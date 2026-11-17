@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 const BASE =
   "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-ink/60 " +
-  "transition-colors duration-150 ease-swift";
+  "transition-colors duration-150 ease-swift disabled:pointer-events-none disabled:opacity-40";
 
 const VARIANTS: Record<string, string> = {
   ghost: "border-transparent hover:bg-muted hover:text-ink",

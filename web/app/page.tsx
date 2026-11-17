@@ -192,7 +192,7 @@ export default async function Page() {
               <IconLink href="/runs" icon={ArrowUpRight} label="Rincian kelengkapan" />
             </CardActions>
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col space-y-4">
+          <CardContent className="flex flex-1 flex-col gap-4">
             <MeterRow
               label="Deskripsi"
               percent={overview.description_coverage}

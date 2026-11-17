@@ -9,13 +9,35 @@ export function formatIDR(value: number | null | undefined): string {
 
 export function formatShortIDR(value: number | null | undefined): string {
   if (value === null || value === undefined) return "-";
-  if (value >= 1_000_000) return `Rp ${(value / 1_000_000).toFixed(value % 1_000_000 === 0 ? 0 : 1)}jt`;
+  if (value >= 1_000_000) {
+    const millions = new Intl.NumberFormat("id-ID", {
+      maximumFractionDigits: value % 1_000_000 === 0 ? 0 : 1,
+    }).format(value / 1_000_000);
+    return `Rp ${millions}jt`;
+  }
   return formatIDR(value);
 }
 
 export function formatNumber(value: number | null | undefined): string {
   if (value === null || value === undefined) return "-";
   return new Intl.NumberFormat("id-ID").format(value);
+}
+
+/* Salary periods are normalised to a month before storage, so the suffix is
+   static; keeping it here stops three pages from inventing their own wording. */
+export const SALARY_PERIOD_SUFFIX = "/bln";
+
+/** "Rp 8jt – 12jt", or a single value when the posting gives one bound only. */
+export function formatSalary(
+  min: number | null | undefined,
+  max: number | null | undefined,
+): string {
+  if (min === null || min === undefined) {
+    if (max === null || max === undefined) return "-";
+    return formatShortIDR(max);
+  }
+  if (max === null || max === undefined || max === min) return formatShortIDR(min);
+  return `${formatShortIDR(min)} – ${formatShortIDR(max)}`;
 }
 
 export function formatDate(value: string | null | undefined): string {

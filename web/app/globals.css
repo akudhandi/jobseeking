@@ -111,4 +111,11 @@
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
+
+  /* Horizontal strips clip a pill mid-shape at their edge; fading the last
+     24px tells the eye the row continues instead of looking cut off. */
+  .fade-r {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+  }
 }
