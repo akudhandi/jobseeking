@@ -51,6 +51,8 @@ export default function JobsPage() {
 
   const [data, setData] = useState<JobsResponse>(EMPTY);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     apiGet<Meta>("/meta").then(setMeta).catch(() => setMeta(null));
@@ -77,12 +79,18 @@ export default function JobsPage() {
     setLoading(true);
     const timer = setTimeout(() => {
       apiGet<JobsResponse>(`/jobs${query}`)
-        .then(setData)
-        .catch(() => setData(EMPTY))
+        .then((res) => {
+          setData(res);
+          setFailed(false);
+        })
+        .catch(() => {
+          setData(EMPTY);
+          setFailed(true);
+        })
         .finally(() => setLoading(false));
     }, 250);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, nonce]);
 
   useEffect(() => {
     setOffset(0);
@@ -129,8 +137,12 @@ export default function JobsPage() {
         description="Seluruh lowongan aktif hasil scraping endpoint guest LinkedIn. Filter berlaku langsung ke API, bukan hanya ke halaman ini."
         meta={
           <>
-            <span className={loading ? "text-muted-foreground" : "text-ink/70"}>
-              {loading ? "Menghitung…" : `${formatNumber(data.total)} lowongan cocok`}
+            <span className={loading || failed ? "text-muted-foreground" : "text-ink/70"}>
+              {loading
+                ? "Menghitung…"
+                : failed
+                  ? "API tidak merespons"
+                  : `${formatNumber(data.total)} lowongan cocok`}
             </span>
             <span className="opacity-40">·</span>
             <span>
@@ -276,9 +288,11 @@ export default function JobsPage() {
             <CardDescription>
               {loading
                 ? "Memuat lowongan…"
-                : data.items.length
-                  ? `Menampilkan ${start}–${end} dari ${formatNumber(data.total)} lowongan`
-                  : "Tidak ada yang cocok dengan filter ini"}
+                : failed
+                  ? "Permintaan ke API gagal — daftar ini kosong karena tidak ada jawaban, bukan karena tidak ada lowongan"
+                  : data.items.length
+                    ? `Menampilkan ${start}–${end} dari ${formatNumber(data.total)} lowongan`
+                    : "Tidak ada yang cocok dengan filter ini"}
             </CardDescription>
           </div>
           <CardActions>
@@ -318,14 +332,26 @@ export default function JobsPage() {
           {!data.items.length ? (
             <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
               <p className="text-[13px] font-medium text-ink">
-                {loading ? "Mengambil data…" : "Tidak ada lowongan yang cocok"}
+                {loading ? "Mengambil data…" : failed ? "API tidak merespons" : "Tidak ada lowongan yang cocok"}
               </p>
               <p className="max-w-sm text-[12px] leading-relaxed text-muted-foreground">
                 {loading
                   ? "Permintaan sedang diproses oleh API."
-                  : "Longgarkan filter, atau atur ulang lalu mulai dari kata kunci yang lebih umum."}
+                  : failed
+                    ? "Daftar ini kosong karena permintaan gagal, bukan karena datanya kosong. Coba lagi setelah API hidup."
+                    : "Longgarkan filter, atau atur ulang lalu mulai dari kata kunci yang lebih umum."}
               </p>
-              {!loading && activeFilters.length ? (
+              {!loading && failed ? (
+                <button
+                  type="button"
+                  onClick={() => setNonce((n) => n + 1)}
+                  className="mt-1 inline-flex items-center gap-1.5 rounded-pill bg-ink px-3 py-1.5 text-[12px] font-medium text-white hover:bg-ink-soft"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Coba lagi
+                </button>
+              ) : null}
+              {!loading && !failed && activeFilters.length ? (
                 <button
                   type="button"
                   onClick={reset}
