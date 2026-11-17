@@ -38,6 +38,10 @@
 
   body {
     @apply bg-canvas text-foreground;
+    /* Instrument Sans sets a narrow word space (0.2em). At 11-13px that reads
+       as an omission — "201 lowongan" turns into one blob — so widen it a
+       touch without touching letter-spacing. */
+    word-spacing: 0.05em;
   }
 
   /* Display numbers stay aligned: a "17" must not be narrower than a "26". */
