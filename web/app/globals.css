@@ -4,32 +4,95 @@
 
 @layer base {
   :root {
+    /* Retuned shadcn tokens: white surface, near-black ink, hairline borders.
+       --primary is ink, not blue, so links and badges read as text rather than
+       as a second accent competing with the coral CTA. */
     --background: 0 0% 100%;
-    --foreground: 222.2 47.4% 11.2%;
+    --foreground: 240 6% 5%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 47.4% 11.2%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.6rem;
+    --card-foreground: 240 6% 5%;
+    --primary: 240 6% 6%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 45%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+    --destructive: 12 88% 47%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 92%;
+    --input: 240 6% 90%;
+    --ring: 240 6% 20%;
+    --radius: 1.25rem;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-canvas text-foreground;
+  }
+
+  /* Display numbers stay aligned: a "17" must not be narrower than a "26". */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  ::selection {
+    background: #ffe7e0;
+  }
+}
+
+@layer utilities {
+  /* Pastel sweep across the top of the app surface, blurred and masked so it
+     fades into white before it reaches any text. Static on purpose: a blurred
+     animation repaints a large area on every frame, which is a poor trade on a
+     dashboard nobody stares at continuously. */
+  .aurora {
+    position: absolute;
+    left: -10%;
+    right: -10%;
+    top: -180px;
+    height: 460px;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(42% 58% at 6% 34%, rgba(199, 242, 107, 0.9), transparent 72%),
+      radial-gradient(38% 54% at 24% 10%, rgba(159, 232, 200, 0.85), transparent 74%),
+      radial-gradient(46% 62% at 50% 0%, rgba(255, 255, 255, 0.95), transparent 72%),
+      radial-gradient(42% 58% at 74% 12%, rgba(191, 213, 255, 0.85), transparent 74%),
+      radial-gradient(40% 60% at 94% 34%, rgba(255, 201, 212, 0.9), transparent 72%),
+      radial-gradient(36% 50% at 88% 0%, rgba(255, 220, 192, 0.85), transparent 72%);
+    filter: blur(38px) saturate(112%);
+    opacity: 0.6;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.5) 58%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.5) 58%, transparent 100%);
+  }
+
+  /* Behind the highlighted column of a bar chart, so the current period reads
+     as marked-up rather than merely differently coloured. */
+  .hatch {
+    background-image: repeating-linear-gradient(
+      45deg,
+      rgba(255, 77, 46, 0.32) 0px,
+      rgba(255, 77, 46, 0.32) 1px,
+      transparent 1px,
+      transparent 5px
+    );
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 }

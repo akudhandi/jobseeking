@@ -2,9 +2,9 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const styles: Record<string, string> = {
-  default: "border-transparent bg-primary text-primary-foreground",
-  secondary: "border-transparent bg-secondary text-secondary-foreground",
-  outline: "text-foreground",
+  default: "border-transparent bg-ink text-white",
+  secondary: "border-transparent bg-muted text-ink/75",
+  outline: "border-line text-ink/75",
   muted: "border-transparent bg-muted text-muted-foreground",
 };
 
@@ -16,7 +16,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
+        "inline-flex items-center rounded-pill border px-2 py-0.5 text-[11px] font-medium",
         styles[variant],
         className,
       )}
