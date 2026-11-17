@@ -145,9 +145,7 @@ export default function JobsPage() {
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>
-            Halaman {page} dari {pages}
-          </CardTitle>
+          <CardTitle>{`Halaman ${page} dari ${pages}`}</CardTitle>
           <div className="flex gap-2">
             <button
               className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"

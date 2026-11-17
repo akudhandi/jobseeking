@@ -48,7 +48,8 @@ const MONTH_LONG = [
   "Desember",
 ];
 
-const pct = (value: number) => value.toString().replace(".", ",");
+const pct = (value: number) =>
+  new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(value);
 
 function monthKey(date: Date) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -181,7 +182,7 @@ export default async function Page() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-4">
+        <Card className="flex flex-col lg:col-span-4">
           <CardHeader>
             <div>
               <CardTitle>Kualitas data</CardTitle>
@@ -191,7 +192,7 @@ export default async function Page() {
               <IconLink href="/runs" icon={ArrowUpRight} label="Rincian kelengkapan" />
             </CardActions>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="flex flex-1 flex-col space-y-4">
             <MeterRow
               label="Deskripsi"
               percent={overview.description_coverage}
@@ -221,7 +222,7 @@ export default async function Page() {
                 className="mt-2"
               />
             </div>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
+            <p className="mt-auto pt-4 text-[11px] leading-relaxed text-muted-foreground">
               Gaji jarang dicantumkan, dan lowongan berbayar mata uang asing tidak dikonversi.
             </p>
           </CardContent>
@@ -252,14 +253,14 @@ export default async function Page() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-4">
+        <Card className="flex flex-col lg:col-span-4">
           <CardHeader>
             <div>
               <CardTitle>Kota teratas</CardTitle>
               <CardDescription>Lowongan yang menyebut nama kota.</CardDescription>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-1 flex-col">
             {overview.by_city.length ? (
               <BarList
                 items={overview.by_city.slice(0, 7).map((item) => ({
@@ -270,21 +271,21 @@ export default async function Page() {
             ) : (
               <Empty />
             )}
-            <p className="mt-4 text-[11px] text-muted-foreground">
+            <p className="mt-auto pt-4 text-[11px] text-muted-foreground">
               {pct(overview.city_coverage)}% lowongan menyebutkan kota; sisanya remote atau hanya
               negara.
             </p>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-4">
+        <Card className="flex flex-col lg:col-span-4">
           <CardHeader>
             <div>
               <CardTitle>Kata kunci</CardTitle>
               <CardDescription>Pencarian yang menemukan lowongan.</CardDescription>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-1 flex-col">
             {overview.by_keyword.length ? (
               <BarList
                 items={overview.by_keyword.slice(0, 7).map((item) => ({
@@ -295,7 +296,7 @@ export default async function Page() {
             ) : (
               <Empty />
             )}
-            <p className="mt-4 text-[11px] text-muted-foreground">
+            <p className="mt-auto pt-4 text-[11px] text-muted-foreground">
               Satu lowongan bisa muncul di beberapa kata kunci, jadi totalnya melebihi jumlah
               lowongan.
             </p>

@@ -88,10 +88,10 @@ export function NavPills({ className }: { className?: string }) {
 }
 
 /** Horizontal scrollable pills for narrow screens, where icons alone lose too much. */
-export function MobileNav() {
+export function MobileNav({ className }: { className?: string }) {
   const pathname = usePathname();
   return (
-    <nav className="scrollbar-none -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 md:hidden">
+    <nav className={cn("scrollbar-none flex gap-1.5 overflow-x-auto pb-1", className)}>
       {NAV.map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (

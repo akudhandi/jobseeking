@@ -130,7 +130,7 @@ export function MeterRow({
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-[13px] text-ink/70">{label}</span>
         <span className="num text-[13px] font-medium text-ink">
-          {percent.toString().replace(".", ",")}%
+          {new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(percent)}%
           {detail ? <span className="ml-1.5 font-normal text-muted-foreground">{detail}</span> : null}
         </span>
       </div>

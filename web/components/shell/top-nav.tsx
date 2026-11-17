@@ -13,7 +13,7 @@ export function TopNav() {
         <Brand />
         <NavPills className="mx-auto hidden md:flex" />
         <div className="ml-auto flex items-center gap-2">
-          <PillLink href="/jobs" icon={Search} variant="glass" className="hidden sm:inline-flex">
+          <PillLink href="/jobs" icon={Search} variant="glass" className="hidden lg:inline-flex">
             Cari lowongan
           </PillLink>
           <ScrapeStatusPill className="hidden md:inline-flex" />
@@ -21,7 +21,7 @@ export function TopNav() {
             href={`${API_BASE}/export.csv`}
             download
             variant="coral"
-            className="hidden sm:inline-flex"
+            className="hidden md:inline-flex"
             title="Unduh semua lowongan aktif sebagai CSV"
           >
             <Download className="h-3.5 w-3.5" />
@@ -29,8 +29,17 @@ export function TopNav() {
           </PillAnchor>
         </div>
       </div>
-      <div className="mt-3 px-4 sm:px-6">
-        <MobileNav />
+      <div className="mt-3 flex items-center gap-1.5 px-4 sm:px-6 md:hidden">
+        <MobileNav className="min-w-0 flex-1" />
+        <PillAnchor
+          href={`${API_BASE}/export.csv`}
+          download
+          variant="coral"
+          title="Unduh semua lowongan aktif sebagai CSV"
+          className="shrink-0 px-2.5"
+        >
+          <Download className="h-4 w-4" />
+        </PillAnchor>
       </div>
     </header>
   );

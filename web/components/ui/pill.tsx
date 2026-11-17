@@ -13,7 +13,7 @@ const VARIANTS: Record<Variant, string> = {
 };
 
 const BASE =
-  "inline-flex items-center justify-center gap-1.5 rounded-pill border px-3 py-1.5 " +
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-pill border px-3 py-1.5 " +
   "text-[13px] font-medium transition-colors duration-150 ease-swift";
 
 export function Pill({

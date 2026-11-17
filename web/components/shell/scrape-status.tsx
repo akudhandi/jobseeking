@@ -44,8 +44,11 @@ export function ScrapeStatusPill({ className }: { className?: string }) {
   }, []);
 
   const status: ScrapeStatus = health?.status ?? "never";
-  const label = loaded ? SCRAPE_STATUS_LABEL[status] : "Memuat status…";
-  const when = health?.last_success_at ? formatRelative(health.last_success_at) : "belum pernah";
+  // "never" means the API really has no successful run on record; a failed
+  // fetch is a different thing and must not be reported as a pipeline problem.
+  const label = !loaded ? "Memuat status…" : health ? SCRAPE_STATUS_LABEL[status] : "Status tidak tersedia";
+  const when = health?.last_success_at ? formatRelative(health.last_success_at) : "";
+  const dot = !loaded || !health ? "bg-ink/20" : DOT[status];
 
   return (
     <Link
@@ -57,9 +60,9 @@ export function ScrapeStatusPill({ className }: { className?: string }) {
         className,
       )}
     >
-      <span className={cn("h-1.5 w-1.5 rounded-full", loaded ? DOT[status] : "bg-ink/20")} />
+      <span className={cn("h-1.5 w-1.5 rounded-full", dot)} />
       {label}
-      {loaded ? <span className="hidden text-muted-foreground xl:inline">{when}</span> : null}
+      {when ? <span className="hidden text-muted-foreground xl:inline">{when}</span> : null}
     </Link>
   );
 }

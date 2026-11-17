@@ -23,6 +23,23 @@ export interface ColumnDatum {
 const MARGIN = { top: 14, right: 6, left: 0, bottom: 2 };
 const X_AXIS_HEIGHT = 26;
 
+/**
+ * Recharts' default ticks follow the data maximum (0/35/70/105/140), which is
+ * technically even but reads badly. Round the top up to a step people use.
+ */
+function niceScale(max: number) {
+  if (max <= 4) return { top: 4, ticks: [0, 1, 2, 3, 4] };
+  const rough = max / 4;
+  const magnitude = 10 ** Math.floor(Math.log10(rough));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * magnitude).find((s) => s * 4 >= max) ?? max;
+  const top = Math.ceil(max / step) * step;
+  const ticks: number[] = [];
+  for (let value = 0; value <= top + step / 2; value += step) {
+    ticks.push(Number(value.toFixed(6)));
+  }
+  return { top, ticks };
+}
+
 interface ShapeProps {
   x?: number;
   y?: number;
@@ -62,6 +79,7 @@ export function SegmentColumns({
 
   const measured = box.height || height;
   const plotHeight = Math.max(0, measured - MARGIN.top - MARGIN.bottom - X_AXIS_HEIGHT);
+  const scale = niceScale(Math.max(0, ...data.map((column) => column.value)));
 
   const renderColumn = (props: unknown): React.ReactElement => {
     const { x = 0, y = 0, width = 0, height: barHeight = 0, payload } = props as ShapeProps;
@@ -138,6 +156,8 @@ export function SegmentColumns({
           />
           <YAxis
             width={32}
+            domain={[0, scale.top]}
+            ticks={scale.ticks}
             tickLine={false}
             axisLine={false}
             allowDecimals={false}
