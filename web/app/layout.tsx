@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Aurora } from "@/components/shell/aurora";
@@ -18,6 +18,15 @@ export const metadata: Metadata = {
   description: "Dashboard analitik lowongan kerja developer di Jawa Timur (sumber: LinkedIn)",
 };
 
+/* viewportFit lets the shell respect a phone's gesture bar; the main column
+   adds that inset to its usual bottom padding. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#ffffff",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id" className={sans.variable}>
@@ -26,7 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="relative min-h-[calc(100vh-1rem)] overflow-hidden rounded-shell bg-surface ring-1 ring-line sm:min-h-[calc(100vh-1.5rem)] lg:min-h-[calc(100vh-2.5rem)]">
             <Aurora />
             <TopNav />
-            <main className="relative z-10 mx-auto w-full max-w-[1280px] px-4 pb-20 pt-6 sm:px-6 md:px-8">
+            <main className="relative z-10 mx-auto w-full max-w-[1280px] px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:px-8">
               {children}
             </main>
           </div>

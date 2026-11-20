@@ -16,6 +16,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Input, Select } from "@/components/ui/input";
 import { PillAnchor } from "@/components/ui/pill";
 import { PageHeader } from "@/components/shell/page-header";
+import { SkeletonRows } from "@/components/shell/skeleton";
 import { API_BASE, apiGet, buildQuery } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
@@ -258,7 +259,7 @@ export default function JobsPage() {
             </Field>
 
             <div className="col-span-2 flex items-center justify-between gap-3 self-end sm:col-span-3 xl:col-span-8">
-              <label className="flex cursor-pointer items-center gap-2 text-[12px] text-ink/70">
+              <label className="flex cursor-pointer items-center gap-2 py-1 pr-1 text-[12px] text-ink/70">
                 <input
                   type="checkbox"
                   className="h-3.5 w-3.5 cursor-pointer rounded border-line accent-ink"
@@ -329,19 +330,19 @@ export default function JobsPage() {
             ))}
           </ul>
 
-          {!data.items.length ? (
+          {loading && !data.items.length ? <SkeletonRows rows={8} /> : null}
+
+          {!loading && !data.items.length ? (
             <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
               <p className="text-[13px] font-medium text-ink">
-                {loading ? "Mengambil data…" : failed ? "API tidak merespons" : "Tidak ada lowongan yang cocok"}
+                {failed ? "API tidak merespons" : "Tidak ada lowongan yang cocok"}
               </p>
               <p className="max-w-sm text-[12px] leading-relaxed text-muted-foreground">
-                {loading
-                  ? "Permintaan sedang diproses oleh API."
-                  : failed
-                    ? "Daftar ini kosong karena permintaan gagal, bukan karena datanya kosong. Coba lagi setelah API hidup."
-                    : "Longgarkan filter, atau atur ulang lalu mulai dari kata kunci yang lebih umum."}
+                {failed
+                  ? "Daftar ini kosong karena permintaan gagal, bukan karena datanya kosong. Coba lagi setelah API hidup."
+                  : "Longgarkan filter, atau atur ulang lalu mulai dari kata kunci yang lebih umum."}
               </p>
-              {!loading && failed ? (
+              {failed ? (
                 <button
                   type="button"
                   onClick={() => setNonce((n) => n + 1)}
@@ -351,7 +352,7 @@ export default function JobsPage() {
                   Coba lagi
                 </button>
               ) : null}
-              {!loading && !failed && activeFilters.length ? (
+              {!failed && activeFilters.length ? (
                 <button
                   type="button"
                   onClick={reset}

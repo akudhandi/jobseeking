@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -90,16 +91,36 @@ export function NavPills({ className }: { className?: string }) {
 /** Horizontal scrollable pills for narrow screens, where icons alone lose too much. */
 export function MobileNav({ className }: { className?: string }) {
   const pathname = usePathname();
+  const navRef = useRef<HTMLElement>(null);
+  const activeRef = useRef<HTMLAnchorElement>(null);
+
+  /* Six pills rarely fit a phone, so the active one is scrolled into view.
+     scrollIntoView is not usable here: it also scrolls every ancestor, and the
+     shell is an overflow-hidden box wider than its content (the aurora), so the
+     whole page would slide sideways. Only the strip's own scrollLeft moves. */
+  useEffect(() => {
+    const nav = navRef.current;
+    const pill = activeRef.current;
+    if (!nav || !pill) return;
+    const target = pill.offsetLeft - (nav.clientWidth - pill.clientWidth) / 2;
+    nav.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+  }, [pathname]);
+
   return (
-    <nav className={cn("scrollbar-none fade-r flex gap-1.5 overflow-x-auto pb-1", className)}>
+    <nav
+      ref={navRef}
+      className={cn("scrollbar-none fade-r flex gap-1.5 overflow-x-auto pb-1", className)}
+    >
       {NAV.map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (
           <Link
             key={href}
             href={href}
+            ref={active ? activeRef : undefined}
+            aria-current={active ? "page" : undefined}
             className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-pill border px-3 py-1.5 text-[13px] font-medium",
+              "flex shrink-0 items-center gap-1.5 rounded-pill border px-3 py-2 text-[13px] font-medium",
               active
                 ? "border-transparent bg-ink text-white"
                 : "border-line bg-surface text-ink/70",
