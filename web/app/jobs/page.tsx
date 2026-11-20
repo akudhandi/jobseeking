@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import JobsLoading from "./loading";
 import {
   ChevronLeft,
   ChevronRight,
@@ -42,15 +43,11 @@ const GRID =
 
 export default function JobsPage() {
   /* useSearchParams needs a boundary, and the detail card is addressed by a
-     ?job= query so it can be linked, bookmarked and opened from the palette. */
+     ?job= query so it can be linked, bookmarked and opened from the palette.
+     The route's own loading screen doubles as the fallback, so the prerendered
+     HTML still shows the page skeleton instead of an empty box. */
   return (
-    <Suspense
-      fallback={
-        <div className="rounded-card border border-line bg-surface p-6 text-[12px] text-muted-foreground">
-          Memuat daftar lowongan…
-        </div>
-      }
-    >
+    <Suspense fallback={<JobsLoading />}>
       <JobsPageContent />
     </Suspense>
   );
