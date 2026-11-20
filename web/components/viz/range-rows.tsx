@@ -16,10 +16,16 @@ export interface RangeRow {
 export function RangeRows({
   rows,
   max,
+  labelWidth = "7.5rem",
+  hintAt = "label",
   className,
 }: {
   rows: RangeRow[];
   max?: number;
+  /** Group names vary in length; the caller knows how much room its card has. */
+  labelWidth?: string;
+  /** Counts belong next to the name when it is short, next to the value when it is not. */
+  hintAt?: "label" | "value";
   className?: string;
 }) {
   if (!rows.length) return null;
@@ -33,11 +39,12 @@ export function RangeRows({
         return (
           <li
             key={row.label}
-            className="grid grid-cols-[minmax(0,7.5rem)_1fr_auto] items-center gap-3"
+            style={{ gridTemplateColumns: `minmax(0,${labelWidth}) minmax(0,1fr) auto` }}
+            className="grid items-center gap-3"
           >
             <span className="min-w-0 truncate text-[12px] text-ink/75" title={row.label}>
               {row.label}
-              {row.hint ? (
+              {row.hint && hintAt === "label" ? (
                 <span className="ml-1.5 text-muted-foreground">· {row.hint}</span>
               ) : null}
             </span>
@@ -49,6 +56,9 @@ export function RangeRows({
             </span>
             <span className="num whitespace-nowrap text-right text-[12px] font-medium text-ink">
               {formatShortIDR(row.min)} – {formatShortIDR(row.max)}
+              {row.hint && hintAt === "value" ? (
+                <span className="ml-1.5 font-normal text-muted-foreground">{row.hint}</span>
+              ) : null}
             </span>
           </li>
         );
