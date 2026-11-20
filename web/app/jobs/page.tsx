@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -11,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { JobDetail } from "@/components/jobs/job-detail";
 import { Card, CardActions, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconButton } from "@/components/ui/icon-button";
 import { Input, Select } from "@/components/ui/input";
@@ -39,6 +41,26 @@ const GRID =
   "xl:grid-cols-[minmax(0,1fr)_12rem_9rem_8.5rem_5rem]";
 
 export default function JobsPage() {
+  /* useSearchParams needs a boundary, and the detail card is addressed by a
+     ?job= query so it can be linked, bookmarked and opened from the palette. */
+  return (
+    <Suspense
+      fallback={
+        <div className="rounded-card border border-line bg-surface p-6 text-[12px] text-muted-foreground">
+          Memuat daftar lowongan…
+        </div>
+      }
+    >
+      <JobsPageContent />
+    </Suspense>
+  );
+}
+
+function JobsPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const jobParam = searchParams.get("job");
+
   const [meta, setMeta] = useState<Meta | null>(null);
   const [q, setQ] = useState("");
   const [city, setCity] = useState("");
@@ -54,6 +76,14 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [nonce, setNonce] = useState(0);
+
+  /* The open posting: seeded from the row that was clicked for an instant paint,
+     then replaced by the full record (description, requirements) from the API. */
+  const [selected, setSelected] = useState<JobItem | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailFailed, setDetailFailed] = useState(false);
+  const itemsRef = useRef<JobItem[]>([]);
+  itemsRef.current = data.items;
 
   useEffect(() => {
     apiGet<Meta>("/meta").then(setMeta).catch(() => setMeta(null));
@@ -97,6 +127,52 @@ export default function JobsPage() {
     setOffset(0);
   }, [q, city, skill, workType, seniority, keyword, hasSalary, sort]);
 
+  /* The panel follows ?job=, so a link can point straight at one posting and the
+     browser's back button closes the card. */
+  useEffect(() => {
+    if (!jobParam) {
+      setSelected(null);
+      setDetailLoading(false);
+      setDetailFailed(false);
+      return;
+    }
+    const seeded = itemsRef.current.find((item) => item.job_id === jobParam) ?? null;
+    setSelected(seeded);
+    setDetailLoading(true);
+    setDetailFailed(false);
+    let alive = true;
+    apiGet<JobItem>(`/jobs/${encodeURIComponent(jobParam)}`)
+      .then((job) => {
+        if (!alive) return;
+        setSelected(job);
+        setDetailLoading(false);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setDetailLoading(false);
+        setDetailFailed(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [jobParam]);
+
+  const openJob = useCallback(
+    (job: JobItem) => {
+      const next = new URLSearchParams(window.location.search);
+      next.set("job", job.job_id);
+      router.push(`/jobs?${next.toString()}`, { scroll: false });
+    },
+    [router],
+  );
+
+  const closeJob = useCallback(() => {
+    const next = new URLSearchParams(window.location.search);
+    next.delete("job");
+    const qs = next.toString();
+    router.replace(qs ? `/jobs?${qs}` : "/jobs", { scroll: false });
+  }, [router]);
+
   const page = Math.floor(offset / PAGE_SIZE) + 1;
   const pages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
   const start = data.items.length ? offset + 1 : 0;
@@ -135,7 +211,7 @@ export default function JobsPage() {
       <PageHeader
         crumb="Lowongan"
         title="Lowongan"
-        description="Seluruh lowongan aktif hasil scraping endpoint guest LinkedIn. Filter berlaku langsung ke API, bukan hanya ke halaman ini."
+        description="Seluruh lowongan aktif hasil scraping endpoint guest LinkedIn. Filter berlaku langsung ke API, bukan hanya ke halaman ini. Klik satu baris untuk membaca rinciannya dulu; tautan LinkedIn ada di dalam kartu itu."
         meta={
           <>
             <span className={loading || failed ? "text-muted-foreground" : "text-ink/70"}>
@@ -326,7 +402,7 @@ export default function JobsPage() {
 
           <ul className="divide-y divide-line">
             {data.items.map((job) => (
-              <JobRow key={job.job_id} job={job} />
+              <JobRow key={job.job_id} job={job} onOpen={openJob} />
             ))}
           </ul>
 
@@ -366,6 +442,15 @@ export default function JobsPage() {
           ) : null}
         </div>
       </Card>
+
+      {selected ? (
+        <JobDetail
+          job={selected}
+          loading={detailLoading}
+          failed={detailFailed}
+          onClose={closeJob}
+        />
+      ) : null}
     </div>
   );
 }
@@ -402,24 +487,35 @@ function ColumnLabel({ className, children }: { className?: string; children: Re
   );
 }
 
-function JobRow({ job }: { job: JobItem }) {
+function JobRow({ job, onOpen }: { job: JobItem; onOpen: (job: JobItem) => void }) {
   const salary = job.has_salary ? formatSalary(job.salary_min, job.salary_max) : null;
   const place = [job.city, job.province && job.province !== job.city ? job.province : null]
     .filter(Boolean)
     .join(", ");
 
   return (
-    <li className={cn(GRID, "px-5 py-3.5 transition-colors duration-150 hover:bg-muted/50")}>
-      <div className="min-w-0">
-        <a
-          href={job.url}
-          target="_blank"
-          rel="noreferrer"
-          className="block truncate text-[13px] font-medium text-ink underline-offset-2 hover:underline"
+    <li
+      className={cn(
+        GRID,
+        "group relative px-5 py-3.5 transition-colors duration-150 hover:bg-muted/50 focus-within:bg-muted/50",
+      )}
+    >
+      {/* The whole row opens the detail card. The LinkedIn link lives inside that
+          card, so a click on a posting never leaves the dashboard by surprise. */}
+      <button
+        type="button"
+        onClick={() => onOpen(job)}
+        aria-label={`Lihat rincian ${job.title}`}
+        className="absolute inset-0 z-0 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink/40"
+      />
+
+      <div className="pointer-events-none min-w-0">
+        <span
+          className="block truncate text-[13px] font-medium text-ink underline-offset-2 group-hover:underline"
           title={job.title}
         >
           {job.title}
-        </a>
+        </span>
         <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
           <span className="truncate">{job.company ?? "Perusahaan tidak disebut"}</span>
           <span className="opacity-40">·</span>
@@ -445,7 +541,7 @@ function JobRow({ job }: { job: JobItem }) {
         ) : null}
       </div>
 
-      <div className="hidden min-w-0 items-center gap-1 overflow-hidden xl:flex">
+      <div className="pointer-events-none hidden min-w-0 items-center gap-1 overflow-hidden xl:flex">
         {job.skills.slice(0, 2).map((s) => (
           <Badge key={s} variant="muted" className="shrink-0">
             {s}
@@ -458,7 +554,7 @@ function JobRow({ job }: { job: JobItem }) {
         ) : null}
       </div>
 
-      <div className="hidden min-w-0 md:block">
+      <div className="pointer-events-none hidden min-w-0 md:block">
         <div className="flex items-center gap-1 truncate text-[12px] text-ink/80" title={place || undefined}>
           {job.city ? <MapPin className="h-3 w-3 shrink-0 text-muted-foreground" /> : null}
           <span className="truncate">{job.city ?? "—"}</span>
@@ -470,7 +566,7 @@ function JobRow({ job }: { job: JobItem }) {
         </div>
       </div>
 
-      <div className="hidden text-right md:block">
+      <div className="pointer-events-none hidden text-right md:block">
         <span className={cn("num text-[12px]", salary ? "text-ink" : "text-muted-foreground")}>
           {salary ?? "—"}
         </span>
@@ -479,8 +575,9 @@ function JobRow({ job }: { job: JobItem }) {
         ) : null}
       </div>
 
-      <div className="hidden text-right text-[11px] text-muted-foreground md:block">
-        {formatRelative(job.posted_at)}
+      <div className="pointer-events-none hidden items-center justify-end gap-1.5 text-right text-[11px] text-muted-foreground md:flex">
+        <span>{formatRelative(job.posted_at)}</span>
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-ink/25 transition-transform duration-150 ease-swift group-hover:translate-x-0.5 group-hover:text-ink/45" />
       </div>
     </li>
   );

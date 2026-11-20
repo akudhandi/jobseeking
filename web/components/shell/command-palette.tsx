@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
-import { ArrowUpRight, Loader2, Search } from "lucide-react";
+import { ChevronRight, Loader2, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { NAV } from "@/components/shell/nav";
 import { API_BASE } from "@/lib/api";
@@ -123,8 +123,11 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         router.push(item.href);
         return;
       }
+      /* Open the detail card on /jobs instead of jumping to LinkedIn: the card
+         carries the same "Buka di LinkedIn" button, but the reader gets to see
+         the posting first. */
       close();
-      window.open(item.job.url, "_blank", "noreferrer");
+      router.push(`/jobs?job=${encodeURIComponent(item.job.job_id)}`);
     },
     [close, router],
   );
@@ -214,7 +217,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                   ) : (
                     <>
                       <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                        <ArrowUpRight className="h-3.5 w-3.5 text-ink/45" />
+                        <ChevronRight className="h-3.5 w-3.5 text-ink/45" />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] font-medium text-ink">

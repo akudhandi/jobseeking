@@ -18,6 +18,9 @@ export interface JobItem {
   has_salary: boolean;
   posted_at: string | null;
   scraped_at: string | null;
+  updated_at?: string | null;
+  min_years_experience?: number | null;
+  salary_source?: string | null;
   search_keyword: string | null;
   keywords: string[];
   source: string;
