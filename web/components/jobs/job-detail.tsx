@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Building2, Check, Copy, ExternalLink, MapPin, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PillAnchor } from "@/components/ui/pill";
 import { Skeleton } from "@/components/shell/skeleton";
 import { cn } from "@/lib/utils";
+import { cleanRequirements, limitBlocks, parseDescription } from "@/lib/description";
+import type { DescBlock } from "@/lib/description";
 import {
   formatDate,
   formatRelative,
@@ -18,8 +20,8 @@ import {
 } from "@/lib/format";
 import type { JobItem } from "@/lib/types";
 
-/** Only the first part of a long description is shown until asked for. */
-const DESC_PREVIEW = 1200;
+/** Requirement lists run to 20+ lines; the first few are enough to judge a posting. */
+const REQ_VISIBLE = 8;
 
 /**
  * Detail card for one posting. It opens from the Lowongan list so a click never
@@ -40,14 +42,23 @@ export function JobDetail({
 }) {
   const [mounted, setMounted] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [allRequirements, setAllRequirements] = useState(false);
   const [copied, setCopied] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const blocks = useMemo(() => parseDescription(job.description), [job.description]);
+  const preview = useMemo(() => limitBlocks(blocks, 1400), [blocks]);
+  const requirements = useMemo(
+    () => cleanRequirements(job.requirements, job.description),
+    [job.requirements, job.description],
+  );
 
   useEffect(() => setMounted(true), []);
 
   /* A new posting in the same panel: reset the per-job bits. */
   useEffect(() => {
     setExpanded(false);
+    setAllRequirements(false);
     setCopied(false);
   }, [job.job_id]);
 
@@ -84,10 +95,9 @@ export function JobDetail({
   const place = [job.city, job.province && job.province !== job.city ? job.province : null]
     .filter(Boolean)
     .join(", ");
-  const description = (job.description ?? "").trim();
-  const longDescription = description.length > DESC_PREVIEW;
-  const shownDescription =
-    longDescription && !expanded ? `${description.slice(0, DESC_PREVIEW).trimEnd()}…` : description;
+  const shownBlocks = expanded ? blocks : preview.blocks;
+  const longDescription = preview.truncated || blocks.length > preview.blocks.length;
+  const shownRequirements = allRequirements ? requirements : requirements.slice(0, REQ_VISIBLE);
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-end sm:items-stretch">
@@ -240,30 +250,41 @@ export function JobDetail({
             </Section>
           ) : (
             <>
-              {job.requirements.length ? (
-                <Section title={`Kualifikasi (${job.requirements.length})`}>
-                  <ul className="space-y-1.5">
-                    {job.requirements.map((item, index) => (
-                      <li key={index} className="flex gap-2 text-[12px] leading-relaxed text-ink/85">
-                        <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-ink/35" />
+              {requirements.length ? (
+                <Section title={`Kualifikasi (${requirements.length})`}>
+                  <ol className="space-y-1.5">
+                    {shownRequirements.map((item, index) => (
+                      <li key={index} className="flex gap-2.5 text-[12px] leading-relaxed text-ink/85">
+                        <span className="num w-4 shrink-0 text-right text-[11px] leading-[18px] text-muted-foreground">
+                          {index + 1}
+                        </span>
                         <span className="min-w-0 break-words">{item}</span>
                       </li>
                     ))}
-                  </ul>
+                  </ol>
+                  {requirements.length > REQ_VISIBLE ? (
+                    <button
+                      type="button"
+                      onClick={() => setAllRequirements((value) => !value)}
+                      className="mt-2 text-[11px] font-medium text-ink underline underline-offset-2 hover:text-ink-soft"
+                    >
+                      {allRequirements
+                        ? "Ringkas kembali"
+                        : `Tampilkan ${requirements.length - REQ_VISIBLE} kualifikasi lainnya`}
+                    </button>
+                  ) : null}
                 </Section>
               ) : null}
 
               <Section title="Deskripsi">
-                {description ? (
+                {shownBlocks.length ? (
                   <>
-                    <p className="whitespace-pre-line break-words text-[12px] leading-relaxed text-ink/85">
-                      {shownDescription}
-                    </p>
+                    <Description blocks={shownBlocks} />
                     {longDescription ? (
                       <button
                         type="button"
                         onClick={() => setExpanded((value) => !value)}
-                        className="mt-2 text-[11px] font-medium text-ink underline underline-offset-2 hover:text-ink-soft"
+                        className="mt-2.5 text-[11px] font-medium text-ink underline underline-offset-2 hover:text-ink-soft"
                       >
                         {expanded ? "Ringkas kembali" : "Tampilkan seluruh deskripsi"}
                       </button>
@@ -326,6 +347,64 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       </h3>
       <div className="mt-2">{children}</div>
     </section>
+  );
+}
+
+/** The parsed posting body: headings, prose, bullet lists and short field pairs. */
+function Description({ blocks }: { blocks: DescBlock[] }) {
+  return (
+    <div className="space-y-2.5">
+      {blocks.map((block, index) => {
+        if (block.kind === "heading") {
+          // A heading straight after another is a sub-heading ("Application
+          // development" under "What will my day-to-day look like?").
+          const sub = blocks[index - 1]?.kind === "heading";
+          return (
+            <h4
+              key={index}
+              className={cn(
+                "break-words pt-1.5 tracking-tight text-ink first:pt-0",
+                sub ? "text-[12px] font-medium" : "text-[12px] font-semibold",
+              )}
+            >
+              {block.text}
+            </h4>
+          );
+        }
+
+        if (block.kind === "bullets") {
+          return (
+            <ul key={index} className="space-y-1.5">
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex} className="flex gap-2.5 text-[12px] leading-relaxed text-ink/85">
+                  <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-ink/35" />
+                  <span className="min-w-0 break-words">{item}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
+        if (block.kind === "fields") {
+          return (
+            <dl key={index} className="space-y-1.5 rounded-xl bg-muted/60 px-3 py-2.5">
+              {block.pairs.map((pair, pairIndex) => (
+                <div key={pairIndex} className="flex gap-3 text-[12px] leading-relaxed">
+                  <dt className="w-24 shrink-0 text-muted-foreground">{pair.label}</dt>
+                  <dd className="min-w-0 break-words text-ink/85">{pair.value}</dd>
+                </div>
+              ))}
+            </dl>
+          );
+        }
+
+        return (
+          <p key={index} className="break-words text-[12px] leading-relaxed text-ink/85">
+            {block.text}
+          </p>
+        );
+      })}
+    </div>
   );
 }
 
